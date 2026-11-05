@@ -46,7 +46,15 @@ jobs:
           pod repo update || true
 
       - name: 构建 unsigned iOS 产物（无签名，仅编译验证）
-        run: flutter build ios --release --no-codesign
+        run: |
+          if flutter build ios --release --no-codesign -v > /tmp/build.log 2>&1; then
+            exit 0
+          fi
+          echo "===== flutter 构建失败，重放 xcodebuild 抓冲突双方 ====="
+          CMD=$(grep -m1 "/usr/bin/xcodebuild\| xcodebuild " /tmp/build.log | sed 's/^.*xcodebuild/xcodebuild/')
+          echo "$CMD"
+          cd ios && eval "$CMD" 2>&1 | grep -B2 -A30 "Multiple commands produce\|error:" | head -120
+          exit 1
 
       - name: 打包 unsigned IPA
         run: |
