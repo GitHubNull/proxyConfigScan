@@ -271,7 +271,8 @@ static int copy_jstring (JNIEnv *env, jstring src, char *dst, int dst_size)
     return 0;
 }
 
-JNIEXPORT jint JNICALL Java_com_proxyscan_proxy_config_scan_vpn_Tun2Socks_run (
+/* 注意：包名/类名中的下划线在 JNI 符号里必须转义为 _1（proxy_config_scan → proxy_1config_1scan） */
+JNIEXPORT jint JNICALL Java_com_proxyscan_proxy_1config_1scan_vpn_Tun2Socks_run (
     JNIEnv *env, jclass clazz,
     jint tun_fd, jint mtu,
     jstring netif_ip, jstring netif_mask,
@@ -350,7 +351,7 @@ JNIEXPORT jint JNICALL Java_com_proxyscan_proxy_config_scan_vpn_Tun2Socks_run (
     return err;
 }
 
-JNIEXPORT jint JNICALL Java_com_proxyscan_proxy_config_scan_vpn_Tun2Socks_stop (
+JNIEXPORT jint JNICALL Java_com_proxyscan_proxy_1config_1scan_vpn_Tun2Socks_stop (
     JNIEnv *env, jclass clazz)
 {
     (void)env;

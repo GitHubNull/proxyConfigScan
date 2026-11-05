@@ -151,8 +151,10 @@ object VpnEngine {
         runCatching { localBridge?.close() }
         localBridge = null
 
-        val rc = Tun2Socks.instance.stop()
-        if (rc != Tun2Socks.OK) Logger.w("Tun2Socks.stop 返回 $rc")
+        // 清理路径绝不允许再抛异常（JNI 未链接等场景下二次崩溃会带走整个进程）
+        runCatching { Tun2Socks.instance.stop() }.onFailure {
+            Logger.w("Tun2Socks.stop 异常: ${it.message}")
+        }
         closeTunFd()
 
         runCatching { vpnInterface?.close() }
@@ -228,7 +230,7 @@ object VpnEngine {
         stopStatsTimer()
         runCatching { localBridge?.close() }
         localBridge = null
-        Tun2Socks.instance.stop()
+        runCatching { Tun2Socks.instance.stop() }
         closeTunFd()
         runCatching { vpnInterface?.close() }
         vpnInterface = null
