@@ -30,6 +30,7 @@ abort('未找到 Runner target') if runner.nil?
 def configure_extension_settings(target)
   target.build_configurations.each do |config|
     settings = config.build_settings
+    settings['PRODUCT_NAME'] = '$(TARGET_NAME)'
     settings['PRODUCT_BUNDLE_IDENTIFIER'] = EXT_BUNDLE_ID
     settings['INFOPLIST_FILE'] = "#{EXT_NAME}/Info.plist"
     settings['CODE_SIGN_ENTITLEMENTS'] = "#{EXT_NAME}/#{EXT_NAME}.entitlements"
