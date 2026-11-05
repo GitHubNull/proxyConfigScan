@@ -20,8 +20,12 @@ jobs:
           git clone --recursive --depth 1 https://github.com/heiher/hev-socks5-tunnel /tmp/hev
           cd /tmp/hev
           ./build-apple.sh
+          HEV_XC=$(find . -maxdepth 2 -name "HevSocks5Tunnel.xcframework" | head -1)
           mkdir -p "$GITHUB_WORKSPACE/src/mobile/ios/Frameworks"
-          cp -R bin/HevSocks5Tunnel.xcframework "$GITHUB_WORKSPACE/src/mobile/ios/Frameworks/"
+          cp -R "$HEV_XC" "$GITHUB_WORKSPACE/src/mobile/ios/Frameworks/"
+
+      - name: 接入 PacketTunnel extension target（script/ios-setup-packet-tunnel.rb）
+        run: ruby script/ios-setup-packet-tunnel.rb
 
       - uses: actions/setup-java@v4
         with:

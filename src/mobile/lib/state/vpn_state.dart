@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../util/proxy_uri_validator.dart';
 import '../vpn/proxy_engine.dart';
-import '../vpn/proxy_engine_android.dart';
+import '../vpn/proxy_engine_channels.dart';
 import 'history_state.dart';
 
 /// VPN 聚合快照：状态机 + 上游 + 错误 + 最新统计帧
@@ -110,7 +110,7 @@ class VpnController {
 
 final vpnControllerProvider = Provider<VpnController>((ref) {
   final controller = VpnController(
-    ProxyEngineAndroid(),
+    ProxyEngineChannels(),
     onStart: (config) => ref.read(historyProvider.notifier).touch(config),
   );
   controller.init();

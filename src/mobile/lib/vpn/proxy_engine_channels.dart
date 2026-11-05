@@ -3,9 +3,9 @@ import 'package:flutter/services.dart';
 import '../util/proxy_uri_validator.dart';
 import 'proxy_engine.dart';
 
-/// Android 实现：MethodChannel `proxy_scan/vpn` + EventChannel `proxy_scan/vpn_events`
+/// 平台通道实现（Android/iOS 同面）：MethodChannel `proxy_scan/vpn` + EventChannel `proxy_scan/vpn_events`
 /// （doc/vpn-forwarding-design.md §3，双端同面）。
-class ProxyEngineAndroid implements ProxyEngine {
+class ProxyEngineChannels implements ProxyEngine {
   static const MethodChannel _method = MethodChannel('proxy_scan/vpn');
   static const EventChannel _events = EventChannel('proxy_scan/vpn_events');
 
