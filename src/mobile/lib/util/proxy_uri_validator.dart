@@ -14,6 +14,10 @@ class ProxyConfig {
   /// host 是否处于私网保留段（10/8、172.16/12、192.168/16、169.254/16、127/8）
   final bool isLanHost;
 
+  /// host 是否为回环（127.0.0.1/::1/localhost）——二维码指向手机本机，
+  /// 代理服务实际不在手机上，必连不上，需与 isLanHost 区分提示
+  bool get isLoopbackHost => ProxyUriValidator.isLoopback(host);
+
   String get upstream => '$host:$port';
 }
 
@@ -169,6 +173,12 @@ class ProxyUriValidator {
       if (!RegExp(r'^[a-zA-Z0-9-]+$').hasMatch(label)) return false;
     }
     return true;
+  }
+
+  /// host 是否为回环地址（历史记录复用时回填提示位也用同一口径）
+  static bool isLoopback(String host) {
+    final lower = host.toLowerCase();
+    return lower == 'localhost' || lower == '127.0.0.1' || lower == '::1';
   }
 
   /// host 是否处于私网保留段（历史记录复用时回填提示位也用同一口径）

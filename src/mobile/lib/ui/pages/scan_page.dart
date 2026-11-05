@@ -84,7 +84,9 @@ class _ScanPageState extends ConsumerState<ScanPage> {
           _ResultOverlay(
             scan: scan,
             onResume: _resume,
-            onStart: scan is ScanSuccess ? () => _startVpn(scan.config) : null,
+            onStart: scan is ScanSuccess && !scan.loopbackWarning
+                ? () => _startVpn(scan.config)
+                : null,
           ),
       ],
     );
@@ -105,13 +107,15 @@ class _ResultOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, title, detail, color) = switch (scan) {
-      ScanSuccess(:final config, :final wanWarning) => (
-          Icons.check_circle,
-          '解析成功',
-          wanWarning
-              ? '代理地址：${config.upstream}\n\n提示：目标似乎不在局域网，请确认 Burp 代理地址正确。'
-              : '代理地址：${config.upstream}',
-          Colors.green,
+      ScanSuccess(:final config, :final wanWarning, :final loopbackWarning) => (
+          loopbackWarning ? Icons.error : Icons.check_circle,
+          loopbackWarning ? '地址不可用' : '解析成功',
+          loopbackWarning
+              ? '代理地址：${config.upstream}\n\n${config.host} 是手机本机地址，Burp 代理并不在手机上，启动后必然连不上。\n\n请在 Burp 代理监听器绑定电脑局域网 IP（或全部接口），用插件重新生成二维码后再扫。'
+              : wanWarning
+                  ? '代理地址：${config.upstream}\n\n提示：目标似乎不在局域网，请确认 Burp 代理地址正确。'
+                  : '代理地址：${config.upstream}',
+          loopbackWarning ? Colors.red : Colors.green,
         ),
       ScanFailure(:final message) => (Icons.error, '无法识别', message, Colors.red),
       _ => (Icons.info, '等待扫码', '', Colors.grey),

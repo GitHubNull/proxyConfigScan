@@ -13,12 +13,15 @@ class ScanIdle extends ScanState {
 }
 
 class ScanSuccess extends ScanState {
-  const ScanSuccess(this.config, {this.wanWarning = false});
+  const ScanSuccess(this.config, {this.wanWarning = false, this.loopbackWarning = false});
 
   final ProxyConfig config;
 
   /// host 非公网保留段，UI 需提示"目标似乎不在局域网"
   final bool wanWarning;
+
+  /// host 为回环（127.0.0.1/localhost），代理不在手机上，启动必失败
+  final bool loopbackWarning;
 }
 
 class ScanFailure extends ScanState {
@@ -34,7 +37,11 @@ class ScanNotifier extends Notifier<ScanState> {
   void onBarcode(String raw) {
     try {
       final config = ProxyUriValidator.parse(raw);
-      state = ScanSuccess(config, wanWarning: !config.isLanHost);
+      state = ScanSuccess(
+        config,
+        wanWarning: !config.isLanHost && !config.isLoopbackHost,
+        loopbackWarning: config.isLoopbackHost,
+      );
       // 解析成功即落历史（同 host:port 仅刷新 last_used_at）
       ref.read(historyProvider.notifier).recordScan(config);
     } on ProxyParseException catch (e) {
