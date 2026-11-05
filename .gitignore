@@ -31,7 +31,6 @@ src/mobile/ios/Flutter/app.zip
 src/mobile/ios/Flutter/flutter_assets/
 src/mobile/ios/Flutter/flutter_export_environment.sh
 src/mobile/ios/ServiceDefinitions.json
-src/mobile/ios/Runner.xcworkspace/
 src/mobile/ios/DerivedData/
 src/mobile/.metadata.tmp
 
