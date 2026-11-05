@@ -63,7 +63,7 @@ class LocalSocks5Server(
             if (inp.read() != 0x05) throw IOException("非 SOCKS5 握手")
             val nMethods = inp.read()
             if (nMethods < 0) throw EOFException()
-            val methods = inp.readNBytes(nMethods)
+            val methods = readFully(inp, nMethods)
             if (!methods.contains(0x00.toByte())) {
                 out.write(byteArrayOf(0x05, 0xFF.toByte()))
                 out.flush()
@@ -100,8 +100,8 @@ class LocalSocks5Server(
             onSuccess()
 
             ByteRelay(client, tunnel, onChunk).also { it.start(); it.await() }
-        } catch (_: Throwable) {
-            // 单连接失败不影响监听；异常明细已在 onFailure/Logger 落点上报
+        } catch (t: Throwable) {
+            Logger.w("SOCKS5 连接处理失败: ${t.message}")
         } finally {
             activeConnections.decrementAndGet()
             runCatching { client.close() }
@@ -112,8 +112,7 @@ class LocalSocks5Server(
     private fun readAddress(inp: InputStream): Pair<String, Int>? {
         return when (val atyp = inp.read()) {
             0x01 -> {
-                val raw = inp.readNBytes(4)
-                if (raw.size < 4) throw EOFException()
+                val raw = readFully(inp, 4)
                 val host = raw.joinToString(".") { (it.toInt() and 0xFF).toString() }
                 val port = readPort(inp)
                 host to port
@@ -121,7 +120,7 @@ class LocalSocks5Server(
             0x03 -> {
                 val len = inp.read()
                 if (len <= 0) throw EOFException()
-                val host = String(inp.readNBytes(len), Charsets.ISO_8859_1)
+                val host = String(readFully(inp, len), Charsets.ISO_8859_1)
                 val port = readPort(inp)
                 host to port
             }
@@ -131,9 +130,20 @@ class LocalSocks5Server(
     }
 
     private fun readPort(inp: InputStream): Int {
-        val raw = inp.readNBytes(2)
-        if (raw.size < 2) throw EOFException()
+        val raw = readFully(inp, 2)
         return ((raw[0].toInt() and 0xFF) shl 8) or (raw[1].toInt() and 0xFF)
+    }
+
+    /** InputStream.readNBytes(int) 是 API33+，低版本设备 NoSuchMethodError，这里用循环读替代 */
+    private fun readFully(inp: InputStream, n: Int): ByteArray {
+        val buf = ByteArray(n)
+        var off = 0
+        while (off < n) {
+            val r = inp.read(buf, off, n - off)
+            if (r < 0) throw EOFException()
+            off += r
+        }
+        return buf
     }
 
     private fun replyCommandError(out: OutputStream, code: Byte) {
