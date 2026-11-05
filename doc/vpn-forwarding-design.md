@@ -109,15 +109,47 @@ idle ──start──> preparing ──授权通过──> running ──stop�
 - running 态持有 `PARTIAL_WAKE_LOCK`（引用计数），关屏不断连。
 - 首次启动引导用户对本 App 关闭电池优化（跳系统设置页）；ColorOS 后台冻结另见 known-limitations。
 
-## 9. iOS 对应关系（M5 实现时遵守）
+## 9. iOS 实现（M5 定案）
+
+### 9.1 TCP 栈选型结论（评估于 2026-11-06）
+
+**选定 hev-socks5-tunnel（heiher/hev-socks5-tunnel）**，证据：
+
+- 官方支持 iOS/macOS：`build-apple.sh` 一键产出 `HevSocks5Tunnel.xcframework`；README 明示
+  平台列表含 iOS；MIT；纯 C；活跃维护（评估当日仍有提交，2k+ star）。
+- 库模式：静态库 + `run(config_path)` / `quit()` 嵌入式 API，适合编进 PacketTunnel extension。
+- NetworkExtension 集成模式（issue #12 结论 + 官方 Apple 构建）：扩展进程自建 utun 接口、
+  把 fd 交给隧道（`hev_socks5_tunnel_main` 系列入口），NE 侧只管网络设置与生命周期。
+
+否决项：mieru（Go 内核，iOS 构建需引入 Go 工具链，重）；NEKit 系（Swift 用户态栈，维护风险）；
+自写 TCP 栈（计划既定否决）。
+
+### 9.2 Android → iOS 对应关系
 
 | Android | iOS |
 |---|---|
 | VpnService + Builder | NEPacketTunnelProvider + NETunnelNetworkSettings |
 | `protect(socket)` | 扩展进程内 socket 天然不经隧道 |
-| tun2socks + BTAP_INIT_FD | NEPacketTunnelFlow（TCP 栈选型实现前评估 hev/mieru，禁自写完整 TCP 栈） |
+| badvpn tun2socks（BTAP_INIT_FD） | hev-socks5-tunnel（xcframework 静态库，扩展内同进程） |
 | MethodChannel 桥 | FlutterMethodChannel（同方法名/参数/错误码） |
-| NEVPNManager 不适用 | Runner 用 NEVPNManager 存配置 + `startVPNTunnel(options)` 下发上游 |
+| VpnEngine 状态机 | PacketTunnel 内 Swift 状态机 + App Group 共享状态 |
+| START_STICKY 前台服务 | NE 系统托管（无 FGS 概念） |
+
+### 9.3 与 Android 的关键差异（实现注意）
+
+1. **本地桥位置**：CONNECT 桥（SOCKS5 no-auth + CONNECT 子集 + 字节计数/半关闭）以 Swift
+   重写在 **PacketTunnel extension 进程内**，监听 `127.0.0.1:10808`；hev 配置指向它。
+   Swift 桥遵守 §4 CONNECT 转发条款（与 Kotlin 版逐条对齐）。
+2. **UDP/DNS 协议不同**：hev 走标准 **SOCKS5 UDP ASSOCIATE**（RFC 1928），不是 badvpn udpgw。
+   Swift 桥实现 UDP ASSOCIATE：仅放行目标端口 53，DNS payload 直连 223.5.5.5:53
+   （NWConnection），其余 UDP 丢弃 `udpDropped++`。Android 的 PacketProto/udpgw 帧格式
+   **不适用** iOS 侧。
+3. **上游下发**：Runner 侧 `NEVPNManager` 保存配置（`serverAddress` 存 `host:port`），
+   `startVPNTunnel(options:)` 传参；extension 从 `options`/protocol 读取。
+4. **状态回传**：extension 与 container 经 App Group（UserDefaults suite）共享状态/统计，
+   Runner 侧 EventChannel 轮询转发给 Dart（双端事件面不变）。
+5. **签名**：NetworkExtension（packet-tunnel-provider）+ App Groups entitlement；
+   免费 Apple ID 7 天侧载，长期需付费账号（99$/年），见 known-limitations。
 
 ## 10. 流量统计
 
