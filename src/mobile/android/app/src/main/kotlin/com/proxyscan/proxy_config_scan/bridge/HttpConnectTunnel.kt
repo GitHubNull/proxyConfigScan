@@ -38,9 +38,10 @@ object HttpConnectTunnel {
     ): Socket {
         val upstream = Socket()
         try {
+            // protect 是防回环的第二道保险；第一道 addDisallowedApplication(self) 已保证
+            // 本应用流量不进 tun。ColorOS 上 protect 可能返回 false，降级为仅告警继续。
             if (!protect(upstream)) {
-                upstream.close()
-                throw TunnelException("INTERNAL", "VpnService.protect 失败")
+                Logger.w("protect(upstream) 返回 false，依赖 disallowed-self 防回环继续连接")
             }
             upstream.connect(InetSocketAddress(upstreamHost, upstreamPort), TIMEOUT_MS)
             upstream.soTimeout = TIMEOUT_MS

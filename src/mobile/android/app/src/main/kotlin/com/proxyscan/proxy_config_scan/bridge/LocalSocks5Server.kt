@@ -144,8 +144,7 @@ class LocalSocks5Server(
     private fun directConnect(target: Pair<String, Int>, protect: (Socket) -> Boolean): Socket {
         val s = Socket()
         if (!protect(s)) {
-            s.close()
-            throw IOException("VpnService.protect 失败")
+            Logger.w("protect(环回直连 ${target.first}:${target.second}) 返回 false，继续")
         }
         s.connect(InetSocketAddress(target.first, target.second), HttpConnectTunnel.TIMEOUT_MS)
         s.soTimeout = 0

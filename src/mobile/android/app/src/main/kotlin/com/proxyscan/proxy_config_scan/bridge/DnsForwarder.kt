@@ -72,8 +72,7 @@ class DnsForwarder(
         val upstream = DatagramSocket()
         try {
             if (!protect(upstream)) {
-                Logger.w("DNS 上游 socket protect 失败")
-                return
+                Logger.w("protect(DNS 上游) 返回 false，依赖 disallowed-self 继续")
             }
             upstream.soTimeout = QUERY_TIMEOUT_MS
             val dnsInet = InetAddress.getByName(dnsServer)
