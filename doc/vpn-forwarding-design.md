@@ -85,7 +85,7 @@ idle ──start──> preparing ──授权通过──> running ──stop�
 
 ## 5. DNS / UDP
 
-- Android：tun2socks `--udpgw-remote-server-addr 127.0.0.1:7300 --udpgw-transparent-dns`；badvpn 的 udpgw 走 **TCP** 且帧封装为 PacketProto（2B 大端长度 + 载荷），载荷 = `udpgw_header`(1B flags + 2B conid) + 地址(IPv4 4B IP + 2B 端口) + payload；flags：KEEPALIVE=1 / DNS=4 / IPV6=8。`DnsForwarder` 为 TCP 服务器：KEEPALIVE 原样回显；仅放行目标端口 53，payload 经 protected UDP 发 223.5.5.5:53，响应按原 conid/原始地址回填；其余 UDP 丢弃并 `udpDropped++`；多查询并发线程 + 写口加锁防帧交错。
+- Android：tun2socks `--udpgw-remote-server-addr 127.0.0.1:7300 --udpgw-transparent-dns`；badvpn 的 udpgw 走 **TCP** 且帧封装为 PacketProto（2B **小端**长度 + 载荷，badvpn 协议全小端；BAddr 端口为网络字节序直通），载荷 = `udpgw_header`(1B flags + 2B conid) + 地址(IPv4 4B IP + 2B 端口) + payload；flags：KEEPALIVE=1 / DNS=4 / IPV6=8。`DnsForwarder` 为 TCP 服务器：KEEPALIVE 原样回显；仅放行目标端口 53，payload 经 protected UDP 发 223.5.5.5:53，响应按原 conid/原始地址回填；其余 UDP 丢弃并 `udpDropped++`；多查询并发线程 + 写口加锁防帧交错。
 - 注意：tun2socks 会把 udpgw 目标（127.0.0.1:7300）也作为普通目标走 SOCKS CONNECT，本地桥对**环回目标一律本机直连**，不经上游代理。
 - iOS：NETunnelNetworkSettings 配公共 DNS；NEPacketTunnelFlow 的 UDP 读口同样仅处理 53。
 

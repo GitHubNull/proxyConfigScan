@@ -78,14 +78,15 @@ class DnsForwarder(
             val outLock = Any()
             while (running) {
                 val lenBytes = readFully(inp, 2) ?: break
-                val len = ((lenBytes[0].toInt() and 0xFF) shl 8) or (lenBytes[1].toInt() and 0xFF)
+                // PacketProto 帧长为 16 位小端（badvpn 协议全小端，仅 BAddr 端口按网络字节序）
+                val len = (lenBytes[0].toInt() and 0xFF) or ((lenBytes[1].toInt() and 0xFF) shl 8)
                 if (len < 3 || len > MAX_FRAME) {
                     Logger.w("udpgw 帧长度非法: $len")
                     break
                 }
                 val msg = readFully(inp, len) ?: break
                 val flags = msg[0].toInt()
-                val conid = ((msg[1].toInt() and 0xFF) shl 8) or (msg[2].toInt() and 0xFF)
+                val conid = (msg[1].toInt() and 0xFF) or ((msg[2].toInt() and 0xFF) shl 8)
 
                 if (flags and FLAG_KEEPALIVE != 0) {
                     // KEEPALIVE 原样回显（flags+conid，无地址）
@@ -99,6 +100,7 @@ class DnsForwarder(
                     Logger.w("udpgw 帧缺地址段: len=${msg.size}")
                     continue
                 }
+                // BAddr 端口在网络字节序（大端）直通
                 val port = ((msg[3 + addrLen - 2].toInt() and 0xFF) shl 8) or
                     (msg[3 + addrLen - 1].toInt() and 0xFF)
                 if (isV6 || port != 53) {
@@ -144,11 +146,11 @@ class DnsForwarder(
             upstream.receive(resp)
             val payloadOut = resp.data.copyOfRange(resp.offset, resp.offset + resp.length)
 
-            // 响应帧：flags(DNS) + conid + 原始地址 + payload
+            // 响应帧：flags(DNS) + conid(小端) + 原始地址(端口原字节回填) + payload
             val body = ByteArrayOutputStream()
             body.write(FLAG_DNS)
-            body.write(conid shr 8)
             body.write(conid and 0xFF)
+            body.write((conid shr 8) and 0xFF)
             body.write(dstIp)
             body.write(dstPort shr 8)
             body.write(dstPort and 0xFF)
@@ -163,11 +165,11 @@ class DnsForwarder(
         }
     }
 
-    /** PacketProto 帧：2B 大端长度 + 载荷，写口持锁保证帧不交错 */
+    /** PacketProto 帧：2B 小端长度 + 载荷（badvpn 协议小端约定），写口持锁防帧交错 */
     private fun writeFrame(out: OutputStream, lock: Any, body: ByteArray) {
         synchronized(lock) {
-            out.write(body.size shr 8)
             out.write(body.size and 0xFF)
+            out.write((body.size shr 8) and 0xFF)
             out.write(body)
             out.flush()
         }
