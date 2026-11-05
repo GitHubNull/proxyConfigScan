@@ -47,6 +47,26 @@ Android 端                      iOS 端                    局域网        本
 | 代理生效 | VPN 本地转发（免 root） | 直写系统代理（需 root）、引导手动配置（不算自动） |
 | 插件 API | montoya-api 2026.7（Burp 官方唯一推荐） | 旧版 burp-extender-api（已废弃） |
 
+## 数据层（src/mobile/lib/data/）
+
+单表 `proxy_history`，全部口径收敛在 `ProxyHistoryDb`（DAO），UI 只消费 `listAll()` 结果：
+
+```sql
+CREATE TABLE proxy_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  host TEXT NOT NULL,
+  port INTEGER NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  last_used_at INTEGER NOT NULL,
+  UNIQUE(host, port)
+)
+```
+
+- **写入时机**：扫码解析成功 → `upsert`（同 host:port 已存在则仅刷新 `last_used_at`，note 保留）；从历史一键复用启动成功 → `touch` 刷新 `last_used_at`。
+- **展示**：`listAll()` 按 `last_used_at` 倒序。
+- **测试**：`test/proxy_history_db_test.dart` 用 `sqflite_common_ffi` 内存库（每用例唯一库名，规避 ffi 工厂按路径缓存导致的串库）。
+
 ## 关键设计原则
 
 1. **防回环双保险**：`addDisallowedApplication(自身)` + 本地桥所有上游 socket `protect()`。

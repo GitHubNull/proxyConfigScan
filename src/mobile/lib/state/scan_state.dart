@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../util/proxy_uri_validator.dart';
+import 'history_state.dart';
 
 /// 扫码结果状态。
 sealed class ScanState {
@@ -34,6 +35,8 @@ class ScanNotifier extends Notifier<ScanState> {
     try {
       final config = ProxyUriValidator.parse(raw);
       state = ScanSuccess(config, wanWarning: !config.isLanHost);
+      // 解析成功即落历史（同 host:port 仅刷新 last_used_at）
+      ref.read(historyProvider.notifier).recordScan(config);
     } on ProxyParseException catch (e) {
       state = ScanFailure(e.message);
     }

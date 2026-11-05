@@ -42,6 +42,9 @@ dependencies:
   # 6.0.x 在 Android 冷启动 start 时必现 NPE（M1 真机验证），7.x 为当前维护线
   mobile_scanner: ^7.5.0
 
+  # SQLite（单表零代码生成，见 doc/architecture.md §SQLite 选型）
+  sqflite: ^2.4.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -52,6 +55,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  sqflite_common_ffi: ^2.4.5
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

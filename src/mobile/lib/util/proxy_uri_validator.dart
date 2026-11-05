@@ -74,7 +74,7 @@ class ProxyUriValidator {
     final host = _validateHost(uri);
     final port = _validatePort(uri);
 
-    return ProxyConfig(host: host, port: port, isLanHost: _isLanHost(host));
+    return ProxyConfig(host: host, port: port, isLanHost: isLanHost(host));
   }
 
   static Uri? _tryParse(String text) {
@@ -171,7 +171,8 @@ class ProxyUriValidator {
     return true;
   }
 
-  static bool _isLanHost(String host) {
+  /// host 是否处于私网保留段（历史记录复用时回填提示位也用同一口径）
+  static bool isLanHost(String host) {
     if (_looksLikeIpv4(host) && _isValidIpv4(host)) {
       final parts = host.split('.').map(int.parse).toList();
       final a = parts[0];

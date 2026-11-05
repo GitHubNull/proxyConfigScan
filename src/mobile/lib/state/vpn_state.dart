@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../util/proxy_uri_validator.dart';
 import '../vpn/proxy_engine.dart';
 import '../vpn/proxy_engine_android.dart';
+import 'history_state.dart';
 
 /// VPN 聚合快照：状态机 + 上游 + 错误 + 最新统计帧
 class VpnSnapshot {
@@ -33,9 +34,11 @@ class VpnSnapshot {
 
 /// 引擎控制器：封装 [ProxyEngine]，把原生事件流折叠成 [VpnSnapshot]。
 class VpnController {
-  VpnController(this._engine);
+  VpnController(this._engine, {void Function(ProxyConfig config)? onStart})
+      : _onStart = onStart;
 
   final ProxyEngine _engine;
+  final void Function(ProxyConfig config)? _onStart;
   final StreamController<VpnSnapshot> _controller =
       StreamController<VpnSnapshot>.broadcast();
   StreamSubscription<VpnNativeEvent>? _eventsSub;
@@ -59,7 +62,11 @@ class VpnController {
     _controller.add(_current);
   }
 
-  Future<void> start(ProxyConfig config) => _engine.start(config);
+  Future<void> start(ProxyConfig config) async {
+    await _engine.start(config);
+    // 启动成功后刷新历史记录的最近使用时间（同 host:port 幂等）
+    _onStart?.call(config);
+  }
 
   Future<void> stop() => _engine.stop();
 
@@ -102,7 +109,10 @@ class VpnController {
 }
 
 final vpnControllerProvider = Provider<VpnController>((ref) {
-  final controller = VpnController(ProxyEngineAndroid());
+  final controller = VpnController(
+    ProxyEngineAndroid(),
+    onStart: (config) => ref.read(historyProvider.notifier).touch(config),
+  );
   controller.init();
   ref.onDispose(controller.dispose);
   return controller;
