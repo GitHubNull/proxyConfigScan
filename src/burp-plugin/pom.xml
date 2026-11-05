@@ -28,17 +28,28 @@
             <version>${montoya.version}</version>
             <scope>provided</scope>
         </dependency>
-        <!-- 二维码生成预留：迭代期在 QrCodeGenerator 中使用 -->
+        <!-- 二维码生成：zxing core（javase 的 MatrixToImageWriter 用 JDK ImageIO 自代） -->
         <dependency>
             <groupId>com.google.zxing</groupId>
             <artifactId>core</artifactId>
             <version>${zxing.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
     <build>
         <finalName>${project.artifactId}-${project.version}</finalName>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -52,16 +63,18 @@
                     </archive>
                 </configuration>
             </plugin>
-            <!-- fat-jar 预留：默认不启用；迭代期引入第三方库需要打包进 jar 时
-                 移到 <build><plugins> 生效位置或执行 mvn package -P shade -->
+            <!-- fat-jar：Burp 单 jar 加载，zxing core 必须随包打进（montoya-api 由 Burp 自带保持 provided） -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.6.0</version>
                 <executions>
                     <execution>
-                        <id>shade</id>
-                        <phase>none</phase>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
