@@ -89,9 +89,11 @@ object VpnEngine {
         setState(State.PREPARING)
 
         try {
+            Logger.d("VpnEngine.start: 开始建立 tun（上游=$upstream）")
             val pfd = establishTunnel(service)
                 ?: return fail("TUN_OPEN_FAILED", "VpnService establish 返回空")
             vpnInterface = pfd
+            Logger.d("VpnEngine.start: tun 已建立 fd=${pfd.fd}")
 
             val protectSocket: (java.net.Socket) -> Boolean = { service.protect(it) }
             val protectDatagram: (java.net.DatagramSocket) -> Boolean = { service.protect(it) }
@@ -252,6 +254,7 @@ object VpnEngine {
     }
 
     private fun setState(s: State) {
+        Logger.d("VpnEngine 状态迁移: ${state.name} → ${s.name}（上游=$upstream）")
         state = s
         pushState()
     }

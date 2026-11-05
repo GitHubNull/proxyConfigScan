@@ -30,6 +30,12 @@ class ProxyVpnService : VpnService() {
             Intent(context, ProxyVpnService::class.java).apply { action = ACTION_STOP }
     }
 
+    override fun onCreate() {
+        super.onCreate()
+        Logger.initFile(this)
+        Logger.d("ProxyVpnService onCreate")
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
