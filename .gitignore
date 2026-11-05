@@ -1,0 +1,47 @@
+# 临时文件与中间产物
+tmp/
+
+# Burp 插件构建产物
+src/burp-plugin/target/
+
+# Flutter/Dart（官方模板标准）
+src/mobile/.dart_tool/
+src/mobile/.flutter-plugins
+src/mobile/.flutter-plugins-dependencies
+src/mobile/.packages
+src/mobile/.pub-cache/
+src/mobile/.pub/
+src/mobile/build/
+src/mobile/**/doc/api/
+src/mobile/.flutter-plugins*
+src/mobile/*.iml
+src/mobile/android/.gradle/
+src/mobile/android/captures/
+src/mobile/android/local.properties
+src/mobile/android/key.properties
+src/mobile/android/**/GeneratedPluginRegistrant.java
+src/mobile/android/**/GeneratedPluginRegistrant.kt
+src/mobile/ios/Pods/
+src/mobile/ios/.symlinks/
+src/mobile/ios/Flutter/Flutter.framework
+src/mobile/ios/Flutter/Flutter.podspec
+src/mobile/ios/Flutter/ephemeral/
+src/mobile/ios/Flutter/app.flx
+src/mobile/ios/Flutter/app.zip
+src/mobile/ios/Flutter/flutter_assets/
+src/mobile/ios/Flutter/flutter_export_environment.sh
+src/mobile/ios/ServiceDefinitions.json
+src/mobile/ios/Runner.xcworkspace/
+src/mobile/ios/DerivedData/
+src/mobile/.metadata.tmp
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Python（仓库内 uv venv 也不入库）
+tmp/.venv/
+__pycache__/
+*.pyc
