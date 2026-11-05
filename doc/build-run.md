@@ -36,10 +36,30 @@ script/burp-plugin-build.sh package      # 产出 target/burp-proxy-qr-plugin-0.
 
 ## 端到端运行（M2 起）
 
-1. Burp Suite → Proxy settings → listener 绑定**局域网 IP**（非仅 127.0.0.1），端口 8080。
-2. `script/gen-test-qr.sh <本机局域网IP> 8080`，PNG 投屏。
+1. Burp Suite → Proxy settings → listener 绑定**局域网 IP**（非仅 127.0.0.1），端口 8080；
+   或直接加载 ProxyScan QR 插件（`src/burp-plugin`，进程反查监听器零配置出码）。
+2. `script/gen-test-qr.sh <本机局域网IP> 8080`，PNG 投屏（或扫插件生成的二维码）。
 3. APP 扫码 → 允许 VPN 授权 → 状态页显示"运行中"。
 4. 手机浏览器访问 http://neverssl.com → Burp HTTP history 出现条目即通。
+5. HTTPS 站点需先装 Burp CA（见下节），否则 TLS 握手失败（引擎日志全量 ECONNREFUSED/超时）。
+
+## HTTPS 抓包：手机安装 Burp CA（免 root，用户 CA 档）
+
+一次安装，长期有效（PortSwigger CA 有效期到 2036）：
+
+1. Burp → Settings 搜 "certificate" → Import/export CA certificate → Export → DER → 存 `~/cacert.der`。
+2. `openssl x509 -inform DER -in ~/cacert.der -out ~/cacert.pem`（校验 subject 应为 `CN=PortSwigger CA`），
+   `adb push ~/cacert.der /sdcard/Download/cacert.cer`。
+3. 手机：设置 → 密码与安全 → 系统安全 → 加密与凭据 → **从存储设备安装证书 → CA 证书** →
+   选 Download/cacert.cer → 确认系统警告（Android 强制手动确认，无法 adb 代点；
+   直启 certinstaller 的 file:// intent 在 ColorOS 12 白屏不可用）。
+4. 验证：Chrome 开 https 站点，地址栏无证书错误即装妥（adb 无 root 读不到
+   `/data/misc/user/0/cacerts-added/`，功能验证比文件检查可靠）。
+
+**限制**：用户 CA 只有浏览器及主动信任用户证书的应用认；targetSdk 24+ 且未配
+networkSecurityConfig 的被测 APP 仍不信（免 root 无解，登记 known-limitations）。
+另 Chrome 的 QUIC（UDP 443）按设计被 VPN 丢弃，会自动回退 TCP；偶发卡顿可在
+`chrome://flags` 禁用 QUIC。
 
 ## tun2socks 说明
 
