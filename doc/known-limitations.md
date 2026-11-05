@@ -25,6 +25,8 @@
 | 限制 | 定性 | 说明 |
 |---|---|---|
 | ColorOS 后台冻结 | 平台限制 | 一加/OPPO 需在系统设置允许本 App 后台运行并关闭电池优化，否则灭屏后连接中断 |
+| ColorOS 拦截应用 logcat | 平台限制（已缓解） | untrusted_app 日志不进 logcat；引擎关键事件落盘 `files/vpn-engine.log`，debug 包用 `adb shell run-as com.proxyscan.proxy_config_scan cat files/vpn-engine.log` 读取 |
+| ColorOS 上 `VpnService.protect()` 不可靠 | 平台限制（已缓解） | 离主线程调用返回 false 或抛 @UiThread 异常（即便切主线程也可能返回 false）；protect 降级为尽力调用，防回环由 `addDisallowedApplication(self)` 兜底（内核级路由排除，与 protect 无关） |
 | USB 安装大 APK 易掉线 | 平台限制（已缓解） | 用 `--split-per-abi` 出小包 + `script/adb-install.sh` 自动重试 |
 
 ## 其他
