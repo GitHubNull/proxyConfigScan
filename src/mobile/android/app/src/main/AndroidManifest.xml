@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 扫码（mobile_scanner / ML Kit） -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+
     <application
-        android:label="proxy_config_scan"
+        android:label="抓包代理配置"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
