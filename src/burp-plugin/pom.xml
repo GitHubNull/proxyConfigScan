@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.proxyscan</groupId>
+    <artifactId>burp-proxy-qr-plugin</artifactId>
+    <version>0.1.0</version>
+    <packaging>jar</packaging>
+
+    <name>Burp Proxy QR Plugin</name>
+    <description>生成代理配置二维码，供 ProxyScan 移动应用扫码自动完成抓包代理配置</description>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <montoya.version>2026.7</montoya.version>
+        <zxing.version>3.5.3</zxing.version>
+    </properties>
+
+    <dependencies>
+        <!-- Burp Suite 官方扩展 API：Burp 运行时自带，编译期 provided -->
+        <dependency>
+            <groupId>net.portswigger.burp.extensions</groupId>
+            <artifactId>montoya-api</artifactId>
+            <version>${montoya.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- 二维码生成预留：迭代期在 QrCodeGenerator 中使用 -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>${zxing.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>${project.artifactId}-${project.version}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Implementation-Title>${project.name}</Implementation-Title>
+                            <Implementation-Version>${project.version}</Implementation-Version>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+            <!-- fat-jar 预留：默认不启用；迭代期引入第三方库需要打包进 jar 时
+                 移到 <build><plugins> 生效位置或执行 mvn package -P shade -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>shade</id>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
