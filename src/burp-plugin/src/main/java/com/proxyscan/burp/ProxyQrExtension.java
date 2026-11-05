@@ -14,7 +14,8 @@ public class ProxyQrExtension implements BurpExtension {
     @Override
     public void initialize(MontoyaApi api) {
         api.extension().setName("ProxyScan QR");
-        api.userInterface().registerSuiteTab("ProxyScan QR", new ProxyQrTab(api.logging()));
-        api.logging().logToOutput("ProxyScan QR 插件已加载：标签页填代理地址即可生成二维码");
+        ProxyListenerDetector detector = new ProxyListenerDetector(api);
+        api.userInterface().registerSuiteTab("ProxyScan QR", new ProxyQrTab(api.logging(), detector::detect));
+        api.logging().logToOutput("ProxyScan QR 插件已加载：标签页自动读取 Burp 代理监听器生成二维码");
     }
 }
