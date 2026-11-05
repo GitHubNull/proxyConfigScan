@@ -51,9 +51,12 @@ jobs:
             exit 0
           fi
           echo "===== flutter 构建失败，重放 xcodebuild 抓冲突双方 ====="
-          CMD=$(grep -m1 "/usr/bin/xcodebuild\| xcodebuild " /tmp/build.log | sed 's/^.*xcodebuild/xcodebuild/')
+          CMD=$(grep -m1 "xcodebuild -workspace" /tmp/build.log | sed 's/^.*xcodebuild/xcodebuild/')
+          if [ -z "$CMD" ]; then
+            CMD="xcodebuild -workspace Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos -destination generic/platform=iOS CODE_SIGNING_ALLOWED=NO build"
+          fi
           echo "$CMD"
-          cd ios && eval "$CMD" 2>&1 | grep -B2 -A30 "Multiple commands produce\|error:" | head -120
+          cd ios && { eval "$CMD" 2>&1 || true; } | grep -B2 -A30 "Multiple commands produce\|error:" | head -120
           exit 1
 
       - name: 打包 unsigned IPA
