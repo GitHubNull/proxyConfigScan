@@ -1,12 +1,15 @@
 package com.proxyscan.proxy_config_scan.vpn
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import com.proxyscan.proxy_config_scan.bridge.DnsForwarder
 import com.proxyscan.proxy_config_scan.bridge.LocalSocks5Server
 import com.proxyscan.proxy_config_scan.util.Logger
 import io.flutter.plugin.common.EventChannel
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -65,6 +68,7 @@ object VpnEngine {
     private var wakeLock: PowerManager.WakeLock? = null
     private var statsTimer: ScheduledExecutorService? = null
     private var service: ProxyVpnService? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     /** 连续失败计数（本地桥回调）：达阈值且无成功 → error 态 */
     private val consecutiveFailures = AtomicInteger(0)
@@ -95,8 +99,8 @@ object VpnEngine {
             vpnInterface = pfd
             Logger.d("VpnEngine.start: tun 已建立 fd=${pfd.fd}")
 
-            val protectSocket: (java.net.Socket) -> Boolean = { service.protect(it) }
-            val protectDatagram: (java.net.DatagramSocket) -> Boolean = { service.protect(it) }
+            val protectSocket: (java.net.Socket) -> Boolean = { protectOnMain { service?.protect(it) == true } }
+            val protectDatagram: (java.net.DatagramSocket) -> Boolean = { protectOnMain { service?.protect(it) == true } }
 
             val bridge = LocalSocks5Server(
                 upstreamProvider = { upstream?.let { parseUpstream(it) } },
@@ -111,9 +115,12 @@ object VpnEngine {
                 },
                 onFailure = { code, detail ->
                     Logger.w("CONNECT 失败[$code]: $detail")
-                    val n = consecutiveFailures.incrementAndGet()
-                    if (!sawSuccess && n >= UPSTREAM_FAIL_THRESHOLD) {
-                        fail("UPSTREAM_UNREACHABLE", "连续 $n 次连不上上游 $upstream")
+                    // INTERNAL（如 protect 失败）属本机问题，不计入"上游不可达"判定
+                    if (code != "INTERNAL") {
+                        val n = consecutiveFailures.incrementAndGet()
+                        if (!sawSuccess && n >= UPSTREAM_FAIL_THRESHOLD) {
+                            fail("UPSTREAM_UNREACHABLE", "连续 $n 次连不上上游 $upstream")
+                        }
                     }
                 },
             )
@@ -196,6 +203,26 @@ object VpnEngine {
             .addDnsServer(DNS_SERVER)
             .addDisallowedApplication(service.packageName)
             .establish()
+    }
+
+    /**
+     * ColorOS 对 VpnService.protect() 做了主线程限制（离主线程调用返回 false
+     * 或抛 @UiThread 异常），统一切主线程执行并等结果。
+     */
+    private fun protectOnMain(block: () -> Boolean): Boolean {
+        if (Looper.myLooper() == Looper.getMainLooper()) return block()
+        val latch = CountDownLatch(1)
+        var ok = false
+        mainHandler.post {
+            ok = block()
+            latch.countDown()
+        }
+        return try {
+            latch.await(3, TimeUnit.SECONDS)
+            ok
+        } catch (_: InterruptedException) {
+            false
+        }
     }
 
     private fun closeTunFd() {

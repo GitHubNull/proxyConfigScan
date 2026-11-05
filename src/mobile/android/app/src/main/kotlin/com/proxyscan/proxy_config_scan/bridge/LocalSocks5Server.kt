@@ -6,6 +6,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicInteger
@@ -87,11 +88,21 @@ class LocalSocks5Server(
                 }
 
             val upstream = upstreamProvider() ?: throw IOException("上游未配置")
+            // badvpn 把 udpgw（127.0.0.1:7300）也走 SOCKS CONNECT；环回目标必须本机直连，
+            // 否则 CONNECT 会要求上游代理去连它自己的回环，DNS 转发即失效
             val tunnel = try {
-                HttpConnectTunnel.establish(client, upstream.first, upstream.second, target.first, target.second, protect)
+                if (isLoopbackHost(target.first)) {
+                    directConnect(target, protect)
+                } else {
+                    HttpConnectTunnel.establish(client, upstream.first, upstream.second, target.first, target.second, protect)
+                }
             } catch (e: HttpConnectTunnel.TunnelException) {
                 onFailure(e.code, "${target.first}:${target.second} → ${e.message}")
                 replyCommandError(out, if (e.code == "TUNNEL_HANDSHAKE_FAILED") 0x05 else 0x01)
+                throw e
+            } catch (e: IOException) {
+                onFailure("INTERNAL", "${target.first}:${target.second} → ${e.message}")
+                replyCommandError(out, 0x01)
                 throw e
             }
             client.soTimeout = 0
@@ -128,6 +139,21 @@ class LocalSocks5Server(
             else -> null
         }
     }
+
+    /** 环回目标（udpgw 等）本机直连，不经过上游 CONNECT */
+    private fun directConnect(target: Pair<String, Int>, protect: (Socket) -> Boolean): Socket {
+        val s = Socket()
+        if (!protect(s)) {
+            s.close()
+            throw IOException("VpnService.protect 失败")
+        }
+        s.connect(InetSocketAddress(target.first, target.second), HttpConnectTunnel.TIMEOUT_MS)
+        s.soTimeout = 0
+        return s
+    }
+
+    private fun isLoopbackHost(host: String): Boolean =
+        host == "127.0.0.1" || host == "::1" || host.equals("localhost", ignoreCase = true)
 
     private fun readPort(inp: InputStream): Int {
         val raw = readFully(inp, 2)
