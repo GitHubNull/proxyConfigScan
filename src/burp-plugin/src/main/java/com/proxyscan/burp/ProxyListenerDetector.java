@@ -56,19 +56,31 @@ public class ProxyListenerDetector {
 
     /** 读取当前配置的全部 Proxy 监听器；读取失败返回空表。 */
     public List<Listener> detect() {
-        try {
-            String json = api.burpSuite().exportUserOptionsAsJson("proxy.proxy_request_listeners");
+        // Burp 2023.9+ 代理监听器在 project options；旧版在 user options。依次尝试，命中即返回。
+        for (String json : new String[]{
+                export("project", "proxy.proxy_request_listeners"),
+                export("user", "proxy.proxy_request_listeners"),
+                export("project", null),
+                export("user", null),
+        }) {
             List<Listener> listeners = parse(json);
             if (!listeners.isEmpty()) return listeners;
-        } catch (Exception e) {
-            logging.logToError("ProxyScan QR 按路径导出监听器失败，改全量导出：" + e.getMessage());
         }
+        return List.of();
+    }
+
+    private String export(String scope, String path) {
         try {
-            String json = api.burpSuite().exportUserOptionsAsJson();
-            return parse(json);
+            return path == null
+                    ? (scope.equals("project")
+                        ? api.burpSuite().exportProjectOptionsAsJson()
+                        : api.burpSuite().exportUserOptionsAsJson())
+                    : (scope.equals("project")
+                        ? api.burpSuite().exportProjectOptionsAsJson(path)
+                        : api.burpSuite().exportUserOptionsAsJson(path));
         } catch (Exception e) {
-            logging.logToError("ProxyScan QR 导出 Burp 配置失败：" + e.getMessage());
-            return List.of();
+            logging.logToError("ProxyScan QR 导出 " + scope + " options 失败：" + e.getMessage());
+            return "";
         }
     }
 
@@ -80,9 +92,10 @@ public class ProxyListenerDetector {
         if (root.isJsonArray()) {
             array = root.getAsJsonArray();
         } else if (root.isJsonObject()) {
-            // 全量导出形态：user_options.proxy.proxy_request_listeners（逐层容错下探）
+            // 全量导出形态：{project_options|user_options}.proxy.proxy_request_listeners（逐层容错下探）
             JsonObject obj = root.getAsJsonObject();
-            for (String key : new String[]{"user_options", "proxy", "proxy_request_listeners"}) {
+            String rootKey = obj.has("project_options") ? "project_options" : "user_options";
+            for (String key : new String[]{rootKey, "proxy", "proxy_request_listeners"}) {
                 if (!obj.has(key)) break;
                 JsonElement child = obj.get(key);
                 if (child.isJsonArray()) {

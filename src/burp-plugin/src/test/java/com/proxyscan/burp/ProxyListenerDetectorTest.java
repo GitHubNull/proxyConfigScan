@@ -41,6 +41,18 @@ class ProxyListenerDetectorTest {
     }
 
     @Test
+    void 全量导出project_options根也可解析() {
+        String json = """
+                {"project_options": {"proxy": {"proxy_request_listeners": [
+                  {"listener_port": 8080, "listener_address": "", "running": true}
+                ]}}}
+                """;
+        List<ProxyListenerDetector.Listener> listeners = ProxyListenerDetector.parse(json);
+        assertEquals(1, listeners.size());
+        assertEquals(8080, listeners.get(0).port());
+    }
+
+    @Test
     void 停用的监听器被跳过() {
         String json = """
                 [{"listener_port": 8080, "listener_address": "", "running": false},

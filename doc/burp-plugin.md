@@ -4,24 +4,30 @@
 
 Burp 加载后在标签栏新增 **ProxyScan QR** 页签，**零配置**出码：
 
-1. 打开页签即通过 `api.burpSuite().exportUserOptionsAsJson("proxy.proxy_request_listeners")`
-   读取运行中的 Burp Proxy 监听器，填入下拉框（停用的不显示）；
+1. 打开页签即**进程反查** Burp 实际监听的 TCP 端口（主路径，见下节），填入下拉框；
 2. 选中监听器立即出码：绑定 `0.0.0.0`/空（全部接口）自动替换为本机探测的局域网 IPv4，
    回环绑定给红色警告（手机扫了连不上）；
-3. 「重新读取」可刷新（Burp 里改完监听配置后点一下）；
-4. 手填地址/端口兜底（读取失败时）。
+3. 「重新读取」可刷新；手填地址/端口兜底。
 
 - `ProxyQrExtension`：扩展入口，注册标签页。
-- `ProxyListenerDetector`：官方配置导出 API 读取 + 解析监听器（路径查询/全量导出两种形态容错）。
+- `BurpProcessScanner`：进程反查（主路径）。
+- `ProxyListenerDetector`：官方配置导出 API 读取（兜底路径）。
 - `ProxyQrTab`：Swing UI（监听器下拉 + 二维码 + 警告 + 手填兜底）。
 - `qr/QrCodeGenerator`：zxing core 编码（纠错 M、白边 2 module），PNG 用 JDK ImageIO 输出。
 
-## 关键约束：montoya-api 无监听器枚举接口
+## 监听器获取：进程反查为主，配置导出兜底
 
-核实 montoya-api 2026.7 全包：`api.proxy()` 仅暴露 history/handler 注册，无 Proxy listener 读取
-（早期文档曾计划 `api.proxy().specifications()`，该接口不存在）。官方替代途径是
-`BurpSuite.exportUserOptionsAsJson(path)` 导出实时配置，本插件即用此实现自动读取。
-注意磁盘上的 `~/.BurpSuite/UserConfig*.json` 不含监听器段（运行期不落盘），不要走文件解析。
+历史结论（全部实测/全包核实）：
+
+1. montoya-api 2026.7 无监听器枚举接口（`api.proxy()` 仅 history/handler）；
+2. `exportUserOptionsAsJson` 在本机 Burp（Community 2026）实测拿不到监听器——
+   Burp 2023.9+ 代理监听器移到 project options，且磁盘 `~/.BurpSuite/UserConfig*.json`
+   不含监听器段（运行期不落盘）；
+3. **主路径（用户提出）**：扫系统实际监听端口 → 反查进程命令行含 `burpsuite` 确认 →
+   得到真实绑定地址端口。Linux 走 `/proc/net/tcp{,6}`（LISTEN 态）+ `/proc/<pid>/fd`
+   socket inode 精确归属（同用户无需 root）；其他平台回退 `netstat -ano` 按 pid 过滤。
+   已在真机 Burp 上预验：`::ffff:127.0.0.1:8181` 等监听项可按 inode 精确归属到 Burp 进程。
+4. 兜底路径仍是配置导出 API（project→user、按路径→全量四组合，两种 JSON 形态容错）。
 
 ## 依赖与构建
 
