@@ -1,0 +1,55 @@
+name: ios-build
+
+# macOS runner 计时 ×10 倍率：限定 main 推送 + 手动触发（计划 M5 风险预埋）
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ipa:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: src/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 构建 hev-socks5-tunnel xcframework（iOS TCP 栈，见 doc/vpn-forwarding-design.md §9）
+        run: |
+          git clone --recursive --depth 1 https://github.com/heiher/hev-socks5-tunnel /tmp/hev
+          cd /tmp/hev
+          ./build-apple.sh
+          mkdir -p "$GITHUB_WORKSPACE/src/mobile/ios/Frameworks"
+          cp -R bin/HevSocks5Tunnel.xcframework "$GITHUB_WORKSPACE/src/mobile/ios/Frameworks/"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: 依赖与 CocoaPods
+        run: |
+          flutter pub get
+          pod repo update || true
+
+      - name: 构建 unsigned iOS 产物（无签名，仅编译验证）
+        run: flutter build ios --release --no-codesign
+
+      - name: 打包 unsigned IPA
+        run: |
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -R Runner.app Payload/
+          zip -qr proxyscan-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: proxyscan-ios-unsigned-${{ github.sha }}
+          path: src/mobile/build/ios/iphoneos/proxyscan-unsigned.ipa
+          retention-days: 14
