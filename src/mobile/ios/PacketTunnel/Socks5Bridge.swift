@@ -174,7 +174,7 @@ final class Socks5Bridge {
         hints.ai_socktype = SOCK_STREAM
         var resolved: UnsafeMutablePointer<addrinfo>?
         let gai = getaddrinfo(up.0, String(up.1), &hints, &resolved)
-        guard gai == 0, var rp = resolved else {
+        guard gai == 0, resolved != nil else {
             failureHandler("DNS 解析上游失败 \(up.0)")
             _ = writeAll(clientFd, [0x05, 0x04, 0x00, 0x01, 0, 0, 0, 0, 0, 0]) // host unreachable
             return
@@ -309,7 +309,7 @@ final class Socks5Bridge {
         hints.ai_family = AF_UNSPEC
         hints.ai_socktype = SOCK_STREAM
         var resolved: UnsafeMutablePointer<addrinfo>?
-        guard getaddrinfo(target.host, String(target.port), &hints, &resolved) == 0, var rp = resolved else {
+        guard getaddrinfo(target.host, String(target.port), &hints, &resolved) == 0, resolved != nil else {
             _ = writeAll(clientFd, [0x05, 0x04, 0x00, 0x01, 0, 0, 0, 0, 0, 0])
             return false
         }
@@ -353,7 +353,7 @@ final class Socks5Bridge {
         }
         guard bindOk == 0 else { close(udp); return }
         var addrLen = socklen_t(MemoryLayout<sockaddr_in>.size)
-        withUnsafeMutablePointer(to: &bound) {
+        _ = withUnsafeMutablePointer(to: &bound) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                 getsockname(udp, $0, &addrLen)
             }
