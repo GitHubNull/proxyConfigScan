@@ -68,8 +68,9 @@ final class HevBridge {
                     for (i, pkt) in packets.enumerated() {
                         var header = UInt32(protocols[i].intValue == AF_INET6 ? AF_INET6 : AF_INET)
                         var frame = withUnsafeBytes(of: &header) { Array($0) } + pkt
+                        let frameLen = frame.count
                         _ = frame.withUnsafeMutableBytes { ptr -> Int in
-                            send(self.pair.0, ptr.baseAddress, frame.count, 0)
+                            send(self.pair.0, ptr.baseAddress, frameLen, 0)
                         }
                     }
                 }
