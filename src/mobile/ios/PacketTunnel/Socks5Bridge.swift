@@ -454,10 +454,10 @@ final class Socks5Bridge {
         outPkt += [0, 53]
         outPkt += Array(resp[0..<rn])
 
-        withUnsafePointer(to: client) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+        withUnsafePointer(to: client) { clientPtr in
+            clientPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
                 _ = outPkt.withUnsafeBytes { ptr in
-                    sendto(udpFd, ptr.baseAddress, outPkt.count, 0, $0, clientLen)
+                    sendto(udpFd, ptr.baseAddress, outPkt.count, 0, sa, clientLen)
                 }
             }
         }
