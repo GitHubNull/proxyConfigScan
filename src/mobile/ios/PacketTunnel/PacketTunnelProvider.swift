@@ -108,8 +108,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
     // MARK: - 隧道网络设置（与 Android Builder 参数对齐）
 
-    private func makeTunnelSettings() -> NETunnelNetworkSettings {
-        let settings = NETunnelNetworkSettings(tunnelRemoteAddress: upstream?.0 ?? "127.0.0.1")
+    private func makeTunnelSettings() -> NEPacketTunnelNetworkSettings {
+        let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: upstream?.0 ?? "127.0.0.1")
         let ipv4 = NEIPv4Settings(addresses: ["10.10.10.2"], subnetMasks: ["255.255.255.0"])
         ipv4.includedRoutes = [NEIPv4Route.default()]
         settings.ipv4Settings = ipv4

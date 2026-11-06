@@ -132,7 +132,7 @@ final class Socks5Bridge {
             return (host, port, raw)
         case 0x03: // 域名
             var lenBuf = [UInt8](repeating: 0, count: 1)
-            guard readFully(fd, lenBuf, 1) else { return nil }
+            guard readFully(fd, &lenBuf, 1) else { return nil }
             let n = Int(lenBuf[0])
             var b = [UInt8](repeating: 0, count: n + 2)
             guard readFully(fd, &b, b.count) else { return nil }
@@ -163,7 +163,7 @@ final class Socks5Bridge {
     private func handleConnect(_ clientFd: Int32, target: (host: String, port: Int, raw: [UInt8])) {
         // 目标为环回 → 本机直连（与 Android 一致，防套娃）
         if target.host == "127.0.0.1" || target.host == "::1" || target.host.lowercased() == "localhost" {
-            guard directConnectAndRelay(clientFd, target) else { return }
+            guard directConnectAndRelay(clientFd, target: target) else { return }
             return
         }
 
@@ -181,17 +181,18 @@ final class Socks5Bridge {
         }
 
         var upstreamFd: Int32 = -1
-        while rp != nil {
-            let cand = socket(rp!.pointee.ai_family, rp!.pointee.ai_socktype, rp!.pointee.ai_protocol)
+        var rp: UnsafeMutablePointer<addrinfo>? = resolved
+        while let cur = rp {
+            let cand = socket(cur.pointee.ai_family, cur.pointee.ai_socktype, cur.pointee.ai_protocol)
             if cand >= 0 {
                 // 10s 连接超时
                 var tv = timeval(tv_sec: 10, tv_usec: 0)
                 setsockopt(cand, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
-                let ok = connect(cand, rp!.pointee.ai_addr, rp!.pointee.ai_addrlen)
+                let ok = connect(cand, cur.pointee.ai_addr, cur.pointee.ai_addrlen)
                 if ok == 0 { upstreamFd = cand; break }
                 close(cand)
             }
-            rp = rp!.pointee.ai_next
+            rp = cur.pointee.ai_next
         }
         freeaddrinfo(resolved)
 
@@ -313,13 +314,14 @@ final class Socks5Bridge {
             return false
         }
         var fd: Int32 = -1
-        while rp != nil {
-            let cand = socket(rp!.pointee.ai_family, rp!.pointee.ai_socktype, rp!.pointee.ai_protocol)
-            if cand >= 0 && connect(cand, rp!.pointee.ai_addr, rp!.pointee.ai_addrlen) == 0 {
+        var rp: UnsafeMutablePointer<addrinfo>? = resolved
+        while let cur = rp {
+            let cand = socket(cur.pointee.ai_family, cur.pointee.ai_socktype, cur.pointee.ai_protocol)
+            if cand >= 0 && connect(cand, cur.pointee.ai_addr, cur.pointee.ai_addrlen) == 0 {
                 fd = cand; break
             }
             if cand >= 0 { close(cand) }
-            rp = rp!.pointee.ai_next
+            rp = cur.pointee.ai_next
         }
         freeaddrinfo(resolved)
         guard fd >= 0 else {
@@ -351,7 +353,11 @@ final class Socks5Bridge {
         }
         guard bindOk == 0 else { close(udp); return }
         var addrLen = socklen_t(MemoryLayout<sockaddr_in>.size)
-        getsockname(udp, &bound, &addrLen)
+        withUnsafeMutablePointer(to: &bound) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                getsockname(udp, $0, &addrLen)
+            }
+        }
         let relayPort = Int(in_port_t(bigEndian: bound.sin_port))
 
         // 应答 BND.ADDR=127.0.0.1 BND.PORT

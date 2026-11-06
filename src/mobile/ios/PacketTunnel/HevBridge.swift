@@ -91,9 +91,9 @@ final class HevBridge {
                     let family = Int(buf[0]) // 小端首字节即地址族
                     let pkt = Array(buf[4..<n])
                     if family == AF_INET {
-                        packetFlow.writePackets([pkt], withProtocols: [NSNumber(value: AF_INET)])
+                        packetFlow.writePackets([Data(pkt)], withProtocols: [NSNumber(value: AF_INET)])
                     } else if family == AF_INET6 {
-                        packetFlow.writePackets([pkt], withProtocols: [NSNumber(value: AF_INET6)])
+                        packetFlow.writePackets([Data(pkt)], withProtocols: [NSNumber(value: AF_INET6)])
                     }
                 }
             }
