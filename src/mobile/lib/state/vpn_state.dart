@@ -138,6 +138,25 @@ final batteryExemptedProvider = FutureProvider<bool>((ref) async {
 Future<void> requestBatteryExemption() =>
     _vpnMethodChannel.invokeMethod<Map<dynamic, dynamic>>('requestBatteryExemption');
 
+/// 用户触发的引擎动作（进行中状态）：补授权弹窗等 MethodChannel 挂起窗口的按钮反馈
+enum VpnAction { none, starting, stopping }
+
+final vpnActionProvider = StateProvider<VpnAction>((_) => VpnAction.none);
+
+/// 统一的动作执行入口：置位 → 执行 → 复位；异常原样上抛由调用点弹提示。
+Future<void> runVpnAction(
+  StateController<VpnAction> actionState,
+  VpnAction action,
+  Future<void> Function() body,
+) async {
+  actionState.state = action;
+  try {
+    await body();
+  } finally {
+    actionState.state = VpnAction.none;
+  }
+}
+
 /// 错误码 → 中文文案（设计文档 §3.4）
 String vpnErrorText(String? code, String? message) => switch (code) {
       'USER_DECLINED_CONSENT' => '已取消 VPN 授权，代理未启动',

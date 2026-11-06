@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/proxy_history_db.dart';
+import '../../state/app_state.dart';
 import '../../state/history_state.dart';
 import '../../state/vpn_state.dart';
 import '../../util/proxy_uri_validator.dart';
@@ -45,6 +46,7 @@ class _HistoryTile extends ConsumerWidget {
     final vpn = ref.watch(vpnSnapshotProvider).value ??
         ref.watch(vpnControllerProvider).current;
     final isCurrent = vpn.isRunning && vpn.upstream == record.upstream;
+    final busy = ref.watch(vpnActionProvider) != VpnAction.none;
 
     return ListTile(
       leading: Icon(
@@ -72,7 +74,7 @@ class _HistoryTile extends ConsumerWidget {
             IconButton(
               tooltip: '使用该代理',
               icon: const Icon(Icons.play_arrow),
-              onPressed: () => _reuse(context, ref, vpn),
+              onPressed: busy ? null : () => _reuse(context, ref, vpn),
             ),
           IconButton(
             tooltip: '编辑备注',
@@ -91,6 +93,48 @@ class _HistoryTile extends ConsumerWidget {
 
   Future<void> _reuse(
       BuildContext context, WidgetRef ref, VpnSnapshot vpn) async {
+    // 校验先于一切确认：回环地址必败，直接拦截（顺序必须先回环后公网，
+    // 因为 isLanHost 把 127/8 也算私网段）
+    if (ProxyUriValidator.isLoopback(record.host)) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('地址不可用'),
+          content: Text(
+            '${record.host} 是回环地址（手机本机），Burp 代理并不在手机上，启动后必然连不上。\n\n'
+            '请在 Burp 代理监听器绑定电脑局域网 IP（或全部接口）后重新扫码。',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('知道了'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    if (!ProxyUriValidator.isLanHost(record.host)) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('目标不在局域网'),
+          content: Text('$record.upstream 似乎不是局域网地址，手机可能无法连通。仍要启动吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('仍要启动'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true || !context.mounted) return;
+    }
+    final action = ref.read(vpnActionProvider.notifier);
     final controller = ref.read(vpnControllerProvider);
     if (vpn.isRunning) {
       final switchIt = await showDialog<bool>(
@@ -111,7 +155,7 @@ class _HistoryTile extends ConsumerWidget {
         ),
       );
       if (switchIt != true || !context.mounted) return;
-      await controller.stop();
+      await runVpnAction(action, VpnAction.stopping, () => controller.stop());
     }
     final config = ProxyConfig(
       host: record.host,
@@ -119,11 +163,12 @@ class _HistoryTile extends ConsumerWidget {
       isLanHost: ProxyUriValidator.isLanHost(record.host),
     );
     try {
-      await controller.start(config);
+      await runVpnAction(action, VpnAction.starting, () => controller.start(config));
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('已切换到 ${record.upstream}')),
         );
+        ref.read(tabIndexProvider.notifier).state = 1;
       }
     } on VpnEngineException catch (e) {
       if (context.mounted) {

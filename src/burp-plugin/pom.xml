@@ -46,6 +46,13 @@
             <version>5.10.2</version>
             <scope>test</scope>
         </dependency>
+        <!-- 仅测试用途：独立预览窗用 FlatLaf 复刻 Burp 主题截图走查 UI -->
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>3.4.1</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

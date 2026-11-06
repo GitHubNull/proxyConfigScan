@@ -70,4 +70,21 @@ class ProxyListenerDetectorTest {
         assertTrue(ProxyListenerDetector.parse("{}").isEmpty());
         assertTrue(ProxyListenerDetector.parse("{\"user_options\":{}}").isEmpty());
     }
+
+    @Test
+    void 回环判定覆盖127全段与IPv6全写() {
+        assertTrue(ProxyListenerDetector.isLoopbackAddress("127.0.0.1"));
+        assertTrue(ProxyListenerDetector.isLoopbackAddress("127.0.0.2"));
+        assertTrue(ProxyListenerDetector.isLoopbackAddress("127.10.20.30"));
+        assertTrue(ProxyListenerDetector.isLoopbackAddress("::1"));
+        assertTrue(ProxyListenerDetector.isLoopbackAddress("0:0:0:0:0:0:0:1"));
+        assertTrue(ProxyListenerDetector.isLoopbackAddress("LOCALHOST"));
+        assertTrue(ProxyListenerDetector.isLoopbackAddress("LocalHost"));
+        // 非回环不误判
+        assertFalse(ProxyListenerDetector.isLoopbackAddress("1278.0.0.1"));
+        assertFalse(ProxyListenerDetector.isLoopbackAddress("192.168.1.1"));
+        assertFalse(ProxyListenerDetector.isLoopbackAddress(""));
+        assertFalse(ProxyListenerDetector.isLoopbackAddress(null));
+        assertFalse(new ProxyListenerDetector.Listener("0.0.0.0", 8080).isLoopback());
+    }
 }

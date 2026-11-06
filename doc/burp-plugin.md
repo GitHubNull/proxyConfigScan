@@ -5,14 +5,22 @@
 Burp 加载后在标签栏新增 **ProxyScan QR** 页签，**零配置**出码：
 
 1. 打开页签即**进程反查** Burp 实际监听的 TCP 端口（主路径，见下节），填入下拉框；
-2. 选中监听器立即出码：绑定 `0.0.0.0`/空（全部接口）自动替换为本机探测的局域网 IPv4，
-   回环绑定给红色警告（手机扫了连不上）；
-3. 「重新读取」可刷新；手填地址/端口兜底。
+2. 选中监听器立即出码：绑定 `0.0.0.0`/空（全部接口）自动替换为本机探测的局域网 IPv4；
+3. **回环绑定（`127.` 全段 / `::1` / `localhost`，判定见 `ProxyListenerDetector.isLoopbackAddress`）
+   不出码**：二维码区切换为操作指引面板——说明该监听器仅本机可达、手机扫码后无法抓包，
+   给出 Burp 改绑步骤（Settings → Proxy → Proxy settings → 编辑 listener →
+   Bind to address 选 Specific address → 填本机局域网 IP），并只读展示探测到的
+   局域网 IP 与「复制 IP」按钮；保存后点「重新读取」即出码。
+   手填路径不拦截出码，但手填回环地址同样置警告结论句；
+4. 「重新读取」可刷新；手填地址/端口兜底。
 
 - `ProxyQrExtension`：扩展入口，注册标签页。
 - `BurpProcessScanner`：进程反查（主路径）。
 - `ProxyListenerDetector`：官方配置导出 API 读取（兜底路径）。
-- `ProxyQrTab`：Swing UI（监听器下拉 + 二维码 + 警告 + 手填兜底）。
+- `ProxyQrTab`：Swing UI（监听器下拉 + 二维码/回环指引双卡 CardLayout + 手填兜底）。
+- `Ui`：质感组件集（圆角卡片/按钮/输入框 + 极简纵向布局），配色跟随 Burp（FlatLaf）主题，
+  品牌橙 `#FF6633` 主按钮；`Preview`（test 源）为 FlatLaf 暗色独立预览窗/离屏截图走查工具，
+  用法：`Preview show` 留窗交互，`Preview qr|guide` 出图到 `tmp/ui-preview-*.png`。
 - `qr/QrCodeGenerator`：zxing core 编码（纠错 M、白边 2 module），PNG 用 JDK ImageIO 输出。
 
 ## 监听器获取：进程反查为主，配置导出兜底

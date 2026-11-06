@@ -18,6 +18,7 @@ class StatusPage extends ConsumerWidget {
     final scan = ref.watch(scanProvider);
     final controller = ref.watch(vpnControllerProvider);
     final batteryExempted = ref.watch(batteryExemptedProvider).value ?? true;
+    final action = ref.watch(vpnActionProvider);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -42,15 +43,27 @@ class StatusPage extends ConsumerWidget {
               VpnLifecycle.error => vpnErrorText(vpn.errorCode, vpn.errorMessage),
             }),
             trailing: switch (vpn.lifecycle) {
-              VpnLifecycle.idle => FilledButton(
-                  onPressed: switch (scan) {
-                    ScanSuccess(:final config) => () => _start(context, ref, config),
-                    _ => null,
-                  },
-                  child: const Text('启动'),
+              VpnLifecycle.idle => FilledButton.icon(
+                  onPressed: action == VpnAction.none
+                      ? switch (scan) {
+                          ScanSuccess(:final config) =>
+                            () => _start(context, ref, config),
+                          _ => null,
+                        }
+                      : null,
+                  icon: action == VpnAction.starting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.play_arrow),
+                  label: Text(action == VpnAction.starting ? '正在启动…' : '启动'),
                 ),
               VpnLifecycle.running => OutlinedButton(
-                  onPressed: () => controller.stop(),
+                  onPressed: action == VpnAction.none
+                      ? () => _confirmStop(context, ref)
+                      : null,
                   child: const Text('停止'),
                 ),
               VpnLifecycle.error => TextButton(
@@ -172,10 +185,14 @@ class StatusPage extends ConsumerWidget {
     );
   }
 
-  Future<void> _start(BuildContext context, WidgetRef ref, ProxyConfig config) async {
-    final controller = ref.read(vpnControllerProvider);
+  Future<void> _start(
+      BuildContext context, WidgetRef ref, ProxyConfig config) async {
     try {
-      await controller.start(config);
+      await runVpnAction(
+        ref.read(vpnActionProvider.notifier),
+        VpnAction.starting,
+        () => ref.read(vpnControllerProvider).start(config),
+      );
     } on VpnEngineException catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -183,6 +200,32 @@ class StatusPage extends ConsumerWidget {
         );
       }
     }
+  }
+
+  Future<void> _confirmStop(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('停止代理转发？'),
+        content: const Text('停止后手机流量将直连，不再经过 Burp 抓包。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('停止'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await runVpnAction(
+      ref.read(vpnActionProvider.notifier),
+      VpnAction.stopping,
+      () => ref.read(vpnControllerProvider).stop(),
+    );
   }
 
   static String _formatBytes(int bytes) {

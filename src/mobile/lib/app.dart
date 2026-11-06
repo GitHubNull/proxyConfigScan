@@ -1,36 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'state/app_state.dart';
 import 'ui/pages/history_page.dart';
 import 'ui/pages/scan_page.dart';
 import 'ui/pages/status_page.dart';
 
 /// 应用根组件：底部导航三页（扫码 / 状态 / 历史）。
-class ProxyScanApp extends StatefulWidget {
+/// 页索引由 [tabIndexProvider] 持有，扫码/历史页可主动跳转到状态页。
+class ProxyScanApp extends ConsumerWidget {
   const ProxyScanApp({super.key});
-
-  @override
-  State<ProxyScanApp> createState() => _ProxyScanAppState();
-}
-
-class _ProxyScanAppState extends State<ProxyScanApp> {
-  int _index = 0;
 
   static const _titles = ['扫码配置', '运行状态', '历史记录'];
   static const _pages = [ScanPage(), StatusPage(), HistoryPage()];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final index = ref.watch(tabIndexProvider);
     return MaterialApp(
       title: '抓包代理配置',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
       ),
       home: Scaffold(
-        appBar: AppBar(title: Text(_titles[_index])),
-        body: IndexedStack(index: _index, children: _pages),
+        appBar: AppBar(title: Text(_titles[index])),
+        body: IndexedStack(index: index, children: _pages),
         bottomNavigationBar: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: (i) => setState(() => _index = i),
+          selectedIndex: index,
+          onDestinationSelected: (i) =>
+              ref.read(tabIndexProvider.notifier).state = i,
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.qr_code_scanner),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../state/app_state.dart';
 import '../../state/scan_state.dart';
 import '../../state/vpn_state.dart';
 import '../../util/proxy_uri_validator.dart';
@@ -34,34 +35,60 @@ class _ScanPageState extends ConsumerState<ScanPage> {
     if (raw == null || raw.isEmpty) return;
     _handled = true;
     ref.read(scanProvider.notifier).onBarcode(raw);
+    final scan = ref.read(scanProvider);
+    if (scan is ScanFailure) {
+      _notify('无法识别：${scan.message}');
+      // 2 秒后自动恢复相机，无需用户手动点「继续扫码」
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted && ref.read(scanProvider) is ScanFailure) _resume();
+      });
+    }
   }
 
   void _resume() {
     _handled = false;
     ref.read(scanProvider.notifier).clear();
-    _controller.start();
+  }
+
+  void _notify(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _startVpn(ProxyConfig config) async {
     try {
-      await ref.read(vpnControllerProvider).start(config);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('代理转发已启动：${config.upstream}')),
-        );
-      }
+      await runVpnAction(
+        ref.read(vpnActionProvider.notifier),
+        VpnAction.starting,
+        () => ref.read(vpnControllerProvider).start(config),
+      );
+      if (!mounted) return;
+      _notify('代理转发已启动：${config.upstream}');
+      ref.read(scanProvider.notifier).clear();
+      ref.read(tabIndexProvider.notifier).state = 1;
     } on VpnEngineException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(vpnErrorText(e.code, e.message))),
-        );
-      }
+      _notify(vpnErrorText(e.code, e.message));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final scan = ref.watch(scanProvider);
+    final busy = ref.watch(vpnActionProvider) == VpnAction.starting;
+
+    // 相机只在扫码等待态运行：出结果即释放，恢复等待态再启动
+    ref.listen<ScanState>(scanProvider, (previous, next) {
+      if (next is ScanIdle) {
+        if (_handled) {
+          _handled = false;
+          _controller.start();
+        }
+      } else {
+        _controller.stop();
+      }
+    });
 
     return Stack(
       children: [
@@ -83,8 +110,9 @@ class _ScanPageState extends ConsumerState<ScanPage> {
         else
           _ResultOverlay(
             scan: scan,
+            busy: busy,
             onResume: _resume,
-            onStart: scan is ScanSuccess && !scan.loopbackWarning
+            onStart: scan is ScanSuccess && !scan.loopbackWarning && !busy
                 ? () => _startVpn(scan.config)
                 : null,
           ),
@@ -96,11 +124,13 @@ class _ScanPageState extends ConsumerState<ScanPage> {
 class _ResultOverlay extends StatelessWidget {
   const _ResultOverlay({
     required this.scan,
+    required this.busy,
     required this.onResume,
     this.onStart,
   });
 
   final ScanState scan;
+  final bool busy;
   final VoidCallback onResume;
   final VoidCallback? onStart;
 
@@ -140,17 +170,24 @@ class _ResultOverlay extends StatelessWidget {
           const SizedBox(height: 24),
           if (onStart != null) ...[
             FilledButton.icon(
-              onPressed: onStart,
-              icon: const Icon(Icons.vpn_lock),
-              label: const Text('启动代理'),
+              onPressed: busy ? null : onStart,
+              icon: busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.vpn_lock),
+              label: Text(busy ? '正在启动…' : '启动代理'),
             ),
             const SizedBox(height: 12),
           ],
-          FilledButton.icon(
-            onPressed: onResume,
-            icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('继续扫码'),
-          ),
+          if (!busy)
+            FilledButton.icon(
+              onPressed: onResume,
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('继续扫码'),
+            ),
         ],
       ),
     );

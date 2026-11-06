@@ -105,4 +105,32 @@ void main() {
       );
     });
   });
+
+  group('isLoopback 覆盖 127 全段与 IPv6 全写', () {
+    test('回环判定 true', () {
+      for (final host in [
+        '127.0.0.1',
+        '127.0.0.2',
+        '127.10.20.30',
+        'localhost',
+        'LOCALHOST',
+        '::1',
+        '0:0:0:0:0:0:0:1',
+      ]) {
+        expect(ProxyUriValidator.isLoopback(host), isTrue, reason: host);
+      }
+    });
+
+    test('非回环判定 false（含 isLanHost 把 127/8 算私网的边界）', () {
+      for (final host in ['1278.0.0.1', '192.168.1.1', '10.0.0.1', '::2', '']) {
+        expect(ProxyUriValidator.isLoopback(host), isFalse, reason: host);
+      }
+    });
+
+    test('127.0.0.2 先于 isLanHost 命中回环（历史校验顺序不变式）', () {
+      final host = '127.0.0.2';
+      expect(ProxyUriValidator.isLoopback(host), isTrue);
+      expect(ProxyUriValidator.isLanHost(host), isTrue);
+    });
+  });
 }

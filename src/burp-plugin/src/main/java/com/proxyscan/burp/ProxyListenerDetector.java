@@ -37,9 +37,7 @@ public class ProxyListenerDetector {
     public record Listener(String address, int port) {
         /** 绑定是否为回环（扫码不可达，仅本机可用）。 */
         public boolean isLoopback() {
-            return address.isEmpty()
-                    ? false // 空串 = 绑全部接口，可达
-                    : address.equals("127.0.0.1") || address.equals("::1") || address.equalsIgnoreCase("localhost");
+            return isLoopbackAddress(address);
         }
 
         /** 绑定是否为全部接口（0.0.0.0 / :: / 空串）。 */
@@ -52,6 +50,20 @@ public class ProxyListenerDetector {
             String display = address.isEmpty() ? "0.0.0.0（全部接口）" : address;
             return display + ":" + port;
         }
+    }
+
+    /**
+     * 回环地址判断（覆盖 127/8 全段、IPv6 全写形式、localhost 大小写变体）。
+     * 纯字符串匹配，不走 {@code InetAddress}（避免 DNS 解析副作用与受检异常）。
+     * 空串（全部接口语义）不算回环。
+     */
+    static boolean isLoopbackAddress(String address) {
+        if (address == null || address.isEmpty()) return false;
+        String a = address.trim().toLowerCase();
+        return a.equals("localhost")
+                || a.startsWith("127.")
+                || a.equals("::1")
+                || a.equals("0:0:0:0:0:0:0:1");
     }
 
     /** 读取当前配置的全部 Proxy 监听器；读取失败返回空表。 */

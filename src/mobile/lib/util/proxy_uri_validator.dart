@@ -175,10 +175,14 @@ class ProxyUriValidator {
     return true;
   }
 
-  /// host 是否为回环地址（历史记录复用时回填提示位也用同一口径）
+  /// host 是否为回环地址（历史记录复用时回填提示位也用同一口径；
+  /// 与 Burp 插件 ProxyListenerDetector.isLoopbackAddress 判定一致）
   static bool isLoopback(String host) {
     final lower = host.toLowerCase();
-    return lower == 'localhost' || lower == '127.0.0.1' || lower == '::1';
+    return lower == 'localhost' ||
+        lower == '::1' ||
+        lower == '0:0:0:0:0:0:0:1' ||
+        lower.startsWith('127.');
   }
 
   /// host 是否处于私网保留段（历史记录复用时回填提示位也用同一口径）

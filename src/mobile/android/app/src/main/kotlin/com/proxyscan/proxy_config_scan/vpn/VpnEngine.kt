@@ -67,8 +67,10 @@ object VpnEngine {
     private var dnsForwarder: DnsForwarder? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var statsTimer: ScheduledExecutorService? = null
-    private var service: ProxyVpnService? = null
+
+    /** 事件统一投递主线程（EventSink 要求 @UiThread） */
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var service: ProxyVpnService? = null
 
     /** 连续失败计数（本地桥回调）：达阈值且无成功 → error 态 */
     private val consecutiveFailures = AtomicInteger(0)
@@ -77,6 +79,7 @@ object VpnEngine {
 
     fun attachSink(sink: EventChannel.EventSink?) {
         eventSink = sink
+        Logger.d("EventSink ${if (sink != null) "挂接" else "断开"}")
         if (sink != null) pushState()
     }
 
@@ -271,7 +274,7 @@ object VpnEngine {
         service = null
         upstream = null
         setState(State.ERROR)
-        eventSink?.success(
+        emitEvent(
             mapOf(
                 "type" to "error",
                 "code" to code,
@@ -286,9 +289,25 @@ object VpnEngine {
         pushState()
     }
 
-    private fun pushState() {
+    /**
+     * EventSink 标了 @UiThread，任何线程的推送统一走主线程 Handler；
+     * 发送失败只记日志——绝不能让异常终止统计定时器（scheduleAtFixedRate 遇异常静默停发）。
+     */
+    private fun emitEvent(payload: Map<String, Any?>) {
         val sink = eventSink ?: return
-        sink.success(
+        val send = {
+            runCatching { sink.success(payload) }
+                .onFailure { Logger.w("事件发送失败: ${it.message}") }
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            send()
+        } else {
+            mainHandler.post { send() }
+        }
+    }
+
+    private fun pushState() {
+        emitEvent(
             mapOf(
                 "type" to "state",
                 "state" to state.name.lowercase(),
@@ -298,8 +317,7 @@ object VpnEngine {
     }
 
     private fun pushStats() {
-        val sink = eventSink ?: return
-        sink.success(
+        emitEvent(
             mapOf(
                 "type" to "stats",
                 "txBytes" to txBytes.get(),
