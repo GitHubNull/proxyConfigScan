@@ -73,9 +73,11 @@ networkSecurityConfig 的被测 APP 仍不信（免 root 无解，登记 known-l
 
 | 工作流 | runner | 产物 |
 |---|---|---|
-| `.github/workflows/android-build.yml` | ubuntu | split-per-abi APK artifact |
-| `.github/workflows/ios-build.yml` | macos（计时 ×10 倍率，限定 push main/手动触发） | unsigned IPA artifact |
-| `.github/workflows/burp-plugin.yml` | ubuntu | 插件 jar artifact（`mvn test` + `mvn package`，JDK 21） |
+| `.github/workflows/android-build.yml` | ubuntu | split-per-abi APK artifact + tag 推送时上传 Release Assets |
+| `.github/workflows/ios-build.yml` | macos（计时 ×10 倍率，限定 main/tag 推送+手动触发） | unsigned IPA artifact + tag 推送时上传 Release Assets |
+| `.github/workflows/burp-plugin.yml` | ubuntu | 插件 jar artifact（`mvn test` + `mvn package`，JDK 21）+ tag 推送时上传 Release Assets |
+
+注意：`actions/upload-artifact` 只进 Actions 运行页（14 天保留），**不会**出现在 Release Assets；发布安装包须打 `v*` tag 推送（各工作流 `softprops/action-gh-release` 步骤），或在本地 `gh release upload` 补传。
 
 私有仓即可用 Actions；推送走本机代理（`~/.profile` 已配）。IPA 安装：Xcode/Apple Configurator 2 装到本机信任设备，或 AltStore/Sideloadly 侧载（免费 Apple ID 7 天有效）。
 
