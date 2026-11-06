@@ -6,7 +6,9 @@ import '../../state/app_state.dart';
 import '../../state/history_state.dart';
 import '../../state/vpn_state.dart';
 import '../../util/proxy_uri_validator.dart';
+import '../../util/time_format.dart';
 import '../../vpn/proxy_engine.dart' hide VpnSnapshot;
+import '../upstream_guard.dart';
 
 /// 历史页：扫码落库的代理配置列表，支持一键复用启动、备注编辑、删除。
 class HistoryPage extends ConsumerWidget {
@@ -59,7 +61,7 @@ class _HistoryTile extends ConsumerWidget {
         children: [
           if (record.note.isNotEmpty) Text(record.note),
           Text(
-            '上次使用 ${_formatTime(record.lastUsedAt)}',
+            '上次使用 ${formatScanTime(record.lastUsedAt)}',
             style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
@@ -93,47 +95,9 @@ class _HistoryTile extends ConsumerWidget {
 
   Future<void> _reuse(
       BuildContext context, WidgetRef ref, VpnSnapshot vpn) async {
-    // 校验先于一切确认：回环地址必败，直接拦截（顺序必须先回环后公网，
-    // 因为 isLanHost 把 127/8 也算私网段）
-    if (ProxyUriValidator.isLoopback(record.host)) {
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('地址不可用'),
-          content: Text(
-            '${record.host} 是回环地址（手机本机），Burp 代理并不在手机上，启动后必然连不上。\n\n'
-            '请在 Burp 代理监听器绑定电脑局域网 IP（或全部接口）后重新扫码。',
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('知道了'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-    if (!ProxyUriValidator.isLanHost(record.host)) {
-      final proceed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('目标不在局域网'),
-          content: Text('$record.upstream 似乎不是局域网地址，手机可能无法连通。仍要启动吗？'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('仍要启动'),
-            ),
-          ],
-        ),
-      );
-      if (proceed != true || !context.mounted) return;
-    }
+    final config = ProxyConfig.fromHostPort(record.host, record.port);
+    if (!await ensureUpstreamReady(context, config)) return;
+    if (!context.mounted) return;
     final action = ref.read(vpnActionProvider.notifier);
     final controller = ref.read(vpnControllerProvider);
     if (vpn.isRunning) {
@@ -157,11 +121,6 @@ class _HistoryTile extends ConsumerWidget {
       if (switchIt != true || !context.mounted) return;
       await runVpnAction(action, VpnAction.stopping, () => controller.stop());
     }
-    final config = ProxyConfig(
-      host: record.host,
-      port: record.port,
-      isLanHost: ProxyUriValidator.isLanHost(record.host),
-    );
     try {
       await runVpnAction(action, VpnAction.starting, () => controller.start(config));
       if (context.mounted) {
@@ -229,15 +188,5 @@ class _HistoryTile extends ConsumerWidget {
     if (confirmed == true) {
       await ref.read(historyProvider.notifier).delete(record);
     }
-  }
-
-  static String _formatTime(int millis) {
-    final dt = DateTime.fromMillisecondsSinceEpoch(millis);
-    final now = DateTime.now();
-    final sameDay = dt.year == now.year && dt.month == now.month && dt.day == now.day;
-    final hm =
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    if (sameDay) return '今天 $hm';
-    return '${dt.month}-${dt.day.toString().padLeft(2, '0')} $hm';
   }
 }

@@ -1,5 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
+import '../util/proxy_uri_validator.dart';
+
 /// 历史记录模型（proxy_history 表行）。
 class HistoryRecord {
   const HistoryRecord({
@@ -30,6 +32,29 @@ class HistoryRecord {
       );
 }
 
+/// 最近一次扫码记录（last_scan 单行表）。
+class LastScan {
+  const LastScan({
+    required this.host,
+    required this.port,
+    required this.scannedAt,
+  });
+
+  final String host;
+  final int port;
+  final int scannedAt;
+
+  String get upstream => '$host:$port';
+
+  ProxyConfig toConfig() => ProxyConfig.fromHostPort(host, port);
+
+  factory LastScan.fromMap(Map<String, Object?> map) => LastScan(
+        host: map['host'] as String,
+        port: map['port'] as int,
+        scannedAt: map['scanned_at'] as int,
+      );
+}
+
 /// proxy_history 表 DAO。
 ///
 /// 表结构见 doc/architecture.md：同 host:port 复用一行（UNIQUE 约束 + upsert），
@@ -43,7 +68,7 @@ class ProxyHistoryDb {
 
   static final ProxyHistoryDb instance = ProxyHistoryDb._();
 
-  static const int _version = 1;
+  static const int _version = 2;
 
   String _dbName = 'proxy_history.db';
 
@@ -52,7 +77,18 @@ class ProxyHistoryDb {
   Future<Database> get _database async => _db ??= await openDatabase(
         _dbName,
         version: _version,
-        onCreate: (db, version) => db.execute('''
+        onCreate: (db, version) async {
+          await _createHistoryTable(db);
+          await _createLastScanTable(db);
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          if (oldVersion < 2) {
+            await _createLastScanTable(db);
+          }
+        },
+      );
+
+  static Future<void> _createHistoryTable(Database db) => db.execute('''
           CREATE TABLE proxy_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             host TEXT NOT NULL,
@@ -62,8 +98,16 @@ class ProxyHistoryDb {
             last_used_at INTEGER NOT NULL,
             UNIQUE(host, port)
           )
-        '''),
-      );
+        ''');
+
+  static Future<void> _createLastScanTable(Database db) => db.execute('''
+          CREATE TABLE last_scan (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            host TEXT NOT NULL,
+            port INTEGER NOT NULL,
+            scanned_at INTEGER NOT NULL
+          )
+        ''');
 
   /// 扫码解析成功时落库：已存在则只刷新 [HistoryRecord.lastUsedAt]，note 保留。
   Future<void> upsert({required String host, required int port}) async {
@@ -111,5 +155,36 @@ class ProxyHistoryDb {
       orderBy: 'last_used_at DESC',
     );
     return rows.map(HistoryRecord.fromMap).toList();
+  }
+
+  /// 仅在扫码解析成功后写入，历史页复用不更新，严格对应“最近一次扫码”。
+  Future<void> setLastScan({
+    required String host,
+    required int port,
+    int? scannedAt,
+  }) async {
+    final db = await _database;
+    await db.insert(
+      'last_scan',
+      {
+        'id': 1,
+        'host': host,
+        'port': port,
+        'scanned_at': scannedAt ?? DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<LastScan?> getLastScan() async {
+    final db = await _database;
+    final rows = await db.query('last_scan', where: 'id = 1', limit: 1);
+    if (rows.isEmpty) return null;
+    return LastScan.fromMap(rows.single);
+  }
+
+  Future<void> close() async {
+    await _db?.close();
+    _db = null;
   }
 }

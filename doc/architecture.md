@@ -49,7 +49,7 @@ Android 端                      iOS 端                    局域网        本
 
 ## 数据层（src/mobile/lib/data/）
 
-单表 `proxy_history`，全部口径收敛在 `ProxyHistoryDb`（DAO），UI 只消费 `listAll()` 结果：
+SQLite v2，两张表；全部口径收敛在 `ProxyHistoryDb`（DAO），UI 只消费 `listAll()` / `getLastScan()` 结果：
 
 ```sql
 CREATE TABLE proxy_history (
@@ -60,12 +60,26 @@ CREATE TABLE proxy_history (
   created_at INTEGER NOT NULL,
   last_used_at INTEGER NOT NULL,
   UNIQUE(host, port)
+);
+
+CREATE TABLE last_scan (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  host TEXT NOT NULL,
+  port INTEGER NOT NULL,
+  scanned_at INTEGER NOT NULL
 )
 ```
 
-- **写入时机**：扫码解析成功 → `upsert`（同 host:port 已存在则仅刷新 `last_used_at`，note 保留）；从历史一键复用启动成功 → `touch` 刷新 `last_used_at`。
-- **展示**：`listAll()` 按 `last_used_at` 倒序。
+- **写入时机**：扫码解析成功 → `proxy_history` upsert（同 host:port 已存在则仅刷新 `last_used_at`，note 保留）+ `last_scan` 单行覆盖写；从历史/状态页复用启动成功 → 仅 `touch` 刷新 `last_used_at`，不改 `last_scan`（严格贴合“最近一次扫码”）。
+- **展示**：`listAll()` 按 `last_used_at` 倒序；状态页“最近一次扫码”读 `last_scan`，冷启动仍有数据并可一键回填启动。
+- **并发**：历史记录的写操作经 Notifier 内串行队列（先等首次 `build()` 完成，再写库并重读列表），避免 fire-and-forget 与首载竞态；写入失败不阻塞队列。
+- **迁移**：v1 → v2 时 `onUpgrade` 补建 `last_scan`，历史数据保留。
 - **测试**：`test/proxy_history_db_test.dart` 用 `sqflite_common_ffi` 内存库（每用例唯一库名，规避 ffi 工厂按路径缓存导致的串库）。
+
+## 相机与状态页口径
+
+- **相机运行条件**：仅「扫码 tab 可见 && App 在前台 && 扫码状态为 ScanIdle」时运行；扫码成功/失败、切 tab、退后台、启动代理立即释放，回扫码页且 Idle 时恢复。判定为纯函数 `cameraShouldRun`，页面用串行调度器统一启停，避免连续事件造成 start/stop 抖动。
+- **状态页**：启动按钮优先回填本次扫码结果，否则用 `last_scan`；新增「HTTPS 抓包证书」卡片（自动获取 Burp CA + 平台安装引导，见 vpn-forwarding-design.md §3.5）。
 
 ## 关键设计原则
 

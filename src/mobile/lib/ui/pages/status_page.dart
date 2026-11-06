@@ -1,21 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../ca/ca_state.dart';
+import '../../state/last_scan_state.dart';
 import '../../state/scan_state.dart';
 import '../../state/vpn_state.dart';
 import '../../util/proxy_uri_validator.dart';
+import '../../util/time_format.dart';
 import '../../vpn/proxy_engine.dart';
+import '../upstream_guard.dart';
+import '../widgets/ca_card.dart';
 
-/// 状态页：VPN 状态机 + 实时流量统计 + 启停控制。
-class StatusPage extends ConsumerWidget {
+/// 状态页：VPN 状态机 + 实时流量统计 + 启停控制 + 证书安装。
+class StatusPage extends ConsumerStatefulWidget {
   const StatusPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StatusPage> createState() => _StatusPageState();
+}
+
+class _StatusPageState extends ConsumerState<StatusPage> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    // 用户从系统安装/信任页面返回时复检证书状态
+    _lifecycle = AppLifecycleListener(
+      onResume: () => ref.read(caProvider.notifier).refresh(),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(caProvider.notifier).refresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final asyncSnapshot = ref.watch(vpnSnapshotProvider);
     final vpn = asyncSnapshot.value ??
         ref.watch(vpnControllerProvider).current;
     final scan = ref.watch(scanProvider);
+    final lastScanAsync = ref.watch(lastScanProvider);
+    final lastScan = lastScanAsync.valueOrNull;
+    final startConfig = switch (scan) {
+      ScanSuccess(:final config) => config,
+      _ => lastScan?.toConfig(),
+    };
     final controller = ref.watch(vpnControllerProvider);
     final batteryExempted = ref.watch(batteryExemptedProvider).value ?? true;
     final action = ref.watch(vpnActionProvider);
@@ -44,12 +80,8 @@ class StatusPage extends ConsumerWidget {
             }),
             trailing: switch (vpn.lifecycle) {
               VpnLifecycle.idle => FilledButton.icon(
-                  onPressed: action == VpnAction.none
-                      ? switch (scan) {
-                          ScanSuccess(:final config) =>
-                            () => _start(context, ref, config),
-                          _ => null,
-                        }
+                  onPressed: action == VpnAction.none && startConfig != null
+                      ? () => _start(context, ref, startConfig)
                       : null,
                   icon: action == VpnAction.starting
                       ? const SizedBox(
@@ -78,7 +110,7 @@ class StatusPage extends ConsumerWidget {
             },
           ),
         ),
-        if (vpn.lifecycle == VpnLifecycle.idle && scan is! ScanSuccess)
+        if (vpn.lifecycle == VpnLifecycle.idle && startConfig == null)
           const Padding(
             padding: EdgeInsets.only(top: 8),
             child: Text(
@@ -170,15 +202,32 @@ class StatusPage extends ConsumerWidget {
             ),
           ),
         const SizedBox(height: 12),
+        const CaCard(),
+        const SizedBox(height: 12),
         Card(
           child: ListTile(
             leading: const Icon(Icons.qr_code_2),
             title: const Text('最近一次扫码'),
-            subtitle: Text(switch (scan) {
-              ScanSuccess(:final config) => config.upstream,
-              ScanFailure(:final message) => '失败：$message',
-              _ => '暂无',
-            }),
+            subtitle: lastScanAsync.when(
+              loading: () => const Text('读取中…'),
+              error: (e, _) => Text('读取失败：$e'),
+              data: (last) => last == null
+                  ? const Text('暂无，请到扫码页扫描 Burp 二维码')
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(last.upstream),
+                        Text(
+                          '扫码于 ${formatScanTime(last.scannedAt)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            isThreeLine: lastScan != null,
           ),
         ),
       ],
@@ -187,6 +236,8 @@ class StatusPage extends ConsumerWidget {
 
   Future<void> _start(
       BuildContext context, WidgetRef ref, ProxyConfig config) async {
+    if (!await ensureUpstreamReady(context, config)) return;
+    if (!context.mounted) return;
     try {
       await runVpnAction(
         ref.read(vpnActionProvider.notifier),

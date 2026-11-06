@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../util/proxy_uri_validator.dart';
 import 'history_state.dart';
+import 'last_scan_state.dart';
 
 /// 扫码结果状态。
 sealed class ScanState {
@@ -34,19 +35,26 @@ class ScanNotifier extends Notifier<ScanState> {
   @override
   ScanState build() => const ScanIdle();
 
-  void onBarcode(String raw) {
+  /// 解析成功先同步置位（首个 await 前），再并行落历史与最近扫码。
+  /// 落库失败原样上抛，由扫码页提示，不改写已成功的解析结果。
+  Future<void> onBarcode(String raw) async {
+    final ProxyConfig config;
     try {
-      final config = ProxyUriValidator.parse(raw);
-      state = ScanSuccess(
-        config,
-        wanWarning: !config.isLanHost && !config.isLoopbackHost,
-        loopbackWarning: config.isLoopbackHost,
-      );
-      // 解析成功即落历史（同 host:port 仅刷新 last_used_at）
-      ref.read(historyProvider.notifier).recordScan(config);
+      config = ProxyUriValidator.parse(raw);
     } on ProxyParseException catch (e) {
       state = ScanFailure(e.message);
+      return;
     }
+    state = ScanSuccess(
+      config,
+      wanWarning: !config.isLanHost && !config.isLoopbackHost,
+      loopbackWarning: config.isLoopbackHost,
+    );
+    // 解析成功即落历史（同 host:port 仅刷新 last_used_at）
+    await Future.wait([
+      ref.read(historyProvider.notifier).recordScan(config),
+      ref.read(lastScanProvider.notifier).record(config),
+    ]);
   }
 
   void clear() => state = const ScanIdle();

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#115E59"/>
+      <stop offset="0.55" stop-color="#0F766E"/>
+      <stop offset="1" stop-color="#134E4A"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="512" cy="512" r="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5EEAD4" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#5EEAD4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="arrow" x1="512" y1="745" x2="512" y2="310" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#5EEAD4"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="76" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M430 258H258v172"/>
+    <path d="M594 258h172v172"/>
+    <path d="M258 594v172h172"/>
+  </g>
+  <path d="M472 424h-30l70-114 70 114h-30v281a40 40 0 0 1-80 0Z" fill="url(#arrow)"/>
+</svg>

@@ -45,6 +45,22 @@ script/burp-plugin-build.sh package      # 产出 target/burp-proxy-qr-plugin-0.
 
 ## HTTPS 抓包：手机安装 Burp CA（免 root，用户 CA 档）
 
+### App 内自动获取（推荐）
+
+1. 确保 Burp 监听器可达（App 已扫码或 VPN 运行中），打开「运行状态 → HTTPS 抓包证书」。
+2. 点「安装 Burp CA」并确认目标代理：App 经该代理请求 `http://burp/cert`（失败回落 `http://burpsuite/cert`），
+   限时 8s、限长 64 KiB；拿到 DER 后由原生二次校验。
+3. 按平台完成：
+   - **Android < 11**：系统证书安装器直接弹出，确认安装即可。
+   - **Android 11+**：系统禁止应用携带证书直装用户 CA；证书已保存到 `Download/BurpSuite-CA.cer`，
+     App 跳转安全设置 → 加密与凭据 → 安装证书 → CA 证书 → 选择该文件并确认（系统强制手动确认）。
+   - **iOS**：分享面板 → 存储到「文件」；设置 → 通用 → VPN 与设备管理 安装，
+     再到 设置 → 通用 → 关于本机 → 证书信任设置 完全信任。
+4. 回 App 点「重新检测」：Android 按保存的 SHA-256 指纹匹配 `AndroidCAStore`，
+   显示 subject（如 `CN=PortSwigger CA`）即安装成功；iOS 无法枚举信任库，显示“无法检测”。
+
+### 手动兜底（Burp 内建端点被关闭 / 使用非 Burp 代理）
+
 一次安装，长期有效（PortSwigger CA 有效期到 2036）：
 
 1. Burp → Settings 搜 "certificate" → Import/export CA certificate → Export → DER → 存 `~/cacert.der`。
@@ -84,6 +100,19 @@ networkSecurityConfig 的被测 APP 仍不信（免 root 无解，登记 known-l
 **iOS 工程注入**：`script/ios-setup-packet-tunnel.rb`（xcodeproj gem）在 CI 的 `flutter build ios` 前把 PacketTunnel extension 接入 Runner.xcodeproj，幂等可重跑。本机无 macOS 也能预验——`~/dev_env/ruby/3.2/bin/ruby`（源码自装，配本地 libyaml）+ `gem install xcodeproj` 后直接对 `src/mobile/ios` 副本跑脚本检查产物；注意 `make distclean` 后重编 Ruby 需重新解压源码包（发行包预生成文件会被清掉）。
 
 已踩过的 iOS CI 坑（勿再犯）：根 `.gitignore` 曾误伤 `Runner.xcworkspace/` 导致 SPM 报 workspace 缺失；xcodeproj 建 extension target 不写 `PRODUCT_NAME`，构建系统无默认值 → 产物空名 `.appex` 冲突；flutter#135056「Cycle inside Runner」依赖循环 → Embed App Extensions 必须排在 Run Script/Thin Binary 之前（脚本已处理）。
+
+## 应用图标
+
+母版与导出脚本见 [`src/mobile/icon/README.md`](../src/mobile/icon/README.md)：
+
+```bash
+python3 script/gen-app-icons.py            # 预览 → tmp/appicon/preview.png
+python3 script/gen-app-icons.py --apply    # 覆盖 Android/iOS 资源并自检尺寸/alpha
+```
+
+- 改图只改 `src/mobile/icon/*.svg` 后重跑脚本，不要手改平台 PNG/vector。
+- APK 验证：`unzip -l ... | grep ic_launcher` 应含 `mipmap-anydpi-v26/ic_launcher.xml`；`aapt2 dump badging` 的 application-icon 应指向新图。
+- iOS 图标由 CI 的 `actool` 编译验证。
 
 ## 常见报错对照
 

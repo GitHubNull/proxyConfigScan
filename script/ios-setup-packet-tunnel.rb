@@ -60,6 +60,11 @@ unless runner.source_build_phase.files_references.any? { |f| f.path.to_s.end_wit
   runner.add_file_references([ref])
   puts 'Runner: 已加入 Runner/VpnChannelHandler.swift'
 end
+unless runner.source_build_phase.files_references.any? { |f| f.path.to_s.end_with?('SystemChannelHandler.swift') }
+  ref = runner_group.new_file('SystemChannelHandler.swift')
+  runner.add_file_references([ref])
+  puts 'Runner: 已加入 Runner/SystemChannelHandler.swift'
+end
 
 # ---- 2. PacketTunnel extension target ----
 

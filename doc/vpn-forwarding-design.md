@@ -69,6 +69,21 @@ idle ──start──> preparing ──授权通过──> running ──stop�
 | `TUN_OPEN_FAILED` | VpnService establish 失败 |
 | `INTERNAL` | 其他 |
 
+### 3.5 MethodChannel `proxy_scan/system`（Flutter → 原生，双端同面）
+
+| 方法 | 参数 | 返回 | 错误码 | 说明 |
+|---|---|---|---|---|
+| `caStatus` | - | `{supported: bool, installed: bool?, subject?: String, fingerprintSha256?: String}` | `CA_INTERNAL` | Android 枚举 `AndroidCAStore`；`installed=null` 表示平台无法枚举（iOS） |
+| `installCa` | `{bytes: Uint8List, name: String}` | `{state: "launched"｜"saved"｜"shared", fileName?: String}` | `CA_INVALID_CERT` / `CA_UNSUPPORTED` / `CA_STORAGE_FAILED` / `CA_INTERNAL` | 立即返回，不挂起等待系统 UI；结果由 App resume 后 `caStatus` 复检 |
+| `openAppSettings` | - | `{ok: bool}` | - | 应用详情设置页（相机权限引导） |
+| `openSecuritySettings` | - | `{ok: bool}` | - | Android 安全设置；iOS 无对应入口返回 false |
+
+- **证书来源**：Dart 侧仅从当前 VPN 上游（运行中）或最近一次扫码的代理拉取，经该代理请求 `http://burp/cert`（失败回落 `http://burpsuite/cert`）；限时 8s、限长 64 KiB、仅接受 HTTP 200，DER 由原生 `CertificateFactory` / `SecCertificateCreateWithData` 二次校验。
+- **Android < 11（API < 30）**：`KeyChain.createInstallIntent` 弹系统安装器，返回 `launched`。
+- **Android ≥ 11（API ≥ 30）**：系统禁止应用携带证书数据直装用户 CA；证书落 `Download/BurpSuite-CA.cer`（MediaStore，`IS_PENDING` 两步）后跳安全设置，返回 `saved`。检测优先按保存的 SHA-256 指纹匹配 `AndroidCAStore`，subject 含 `PortSwigger` 仅作兜底。
+- **iOS**：写 `NSTemporaryDirectory()/BurpSuite-CA.cer` 并弹系统分享面板（iPad 需 popover 锚点），返回 `shared`；用户存到「文件」后手动安装并完全信任。iOS 无法枚举用户信任库，`caStatus.installed` 恒为 null。
+- 安装的用户 CA 仅对浏览器及主动信任用户证书的应用生效；targetSdk 24+ 且未配置 `networkSecurityConfig` 的被测 App 仍不信任（见 known-limitations）。
+
 ## 4. CONNECT 转发条款（双端同规约）
 
 1. 每个目标 TCP 连接，向上游发送：

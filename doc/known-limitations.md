@@ -9,6 +9,16 @@
 | 本机无法编译/调试 iOS | 平台限制 | 开发机为 Linux，Xcode 仅 macOS。验证方式：GitHub Actions macOS runner 构建 unsigned IPA 通过（M5 起双工作流绿）+ 代码评审；真机行为待有 Mac 后补验 |
 | iOS 仅编译验证、未真机运行 | 平台限制 | PacketTunnel extension 已实现（hev + Swift 桥，设计见 vpn-forwarding-design.md §9）；无实体 macOS/iPhone，运行时行为未验，侧载安装见 build-run.md |
 | 安装需侧载或付费账号 | 平台限制 | 免费 Apple ID 侧载 7 天过期需重签、同时限 3 个 App；长期分发需 99 美元/年开发者账号。NetworkExtension entitlement 免费账号在开发期可用 |
+| iOS 无法自动安装/枚举 CA | 平台限制 | App 只能把 Burp CA 存到临时文件并弹分享面板；用户须存到「文件」后到 设置 → 通用 → VPN 与设备管理 安装，并在「证书信任设置」完全信任。安装结果 App 无法读取，状态卡片显示“无法检测” |
+
+## 证书（Burp CA）
+
+| 限制 | 定性 | 说明 |
+|---|---|---|
+| Android 11+ 无法一键静默安装用户 CA | 平台限制 | 系统禁止应用携带证书数据直接调用安装器（`KeyChain.createInstallIntent` 被限制，Reqable 非 root 同样只能下载后手动安装）。App 已做到自动获取 + 保存到 `Download/BurpSuite-CA.cer` + 跳转安全设置 + 回 App 指纹复检，最终确认必须在系统 UI 完成 |
+| 用户 CA 不被部分被测 App 信任 | 被测 App 侧限制 | targetSdk 24+ 且未配置 `networkSecurityConfig` 的应用默认不信任用户 CA；浏览器通常可用。免 root 无解，需在被测 App 侧处理 |
+| 不支持 root / 系统证书 | 设计如此 | 定位免 root 用户证书；不做写入系统信任库、不自动点击系统页面 |
+| 非 Burp 代理或被关闭内建端点时取不到 CA | 设计如此 | 证书仅从 `http://burp/cert`、`http://burpsuite/cert` 获取；失败文案明确，保留 build-run.md 的手动导入兜底 |
 
 ## 网络能力
 

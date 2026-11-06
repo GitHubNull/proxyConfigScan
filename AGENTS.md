@@ -39,7 +39,7 @@ ls -l src/mobile/build/app/outputs/flutter-apk/*.apk
 - 默认不写注释；只在"为什么"不显然时写一行（隐藏约束、反直觉不变量、特定 bug 的 workaround）。
 - 文档与设计/选型变更全量同步（doc/ 索引、版本、链接）。
 - 技术栈：Dart/Flutter + Riverpod；Kotlin（VpnService/tun2socks JNI）；Swift（PacketTunnel）；Java 17（Burp 插件，Montoya API）。
-- 平台通道协议（Android/iOS 同面）：MethodChannel `proxy_scan/vpn` + EventChannel `proxy_scan/vpn_events`，改动须双端同步并更新 doc/vpn-forwarding-design.md。
+- 平台通道协议（Android/iOS 同面）：MethodChannel `proxy_scan/vpn` + EventChannel `proxy_scan/vpn_events` + MethodChannel `proxy_scan/system`（CA 状态/安装/设置跳转），改动须双端同步并更新 doc/vpn-forwarding-design.md。
 
 ## Git 约定
 

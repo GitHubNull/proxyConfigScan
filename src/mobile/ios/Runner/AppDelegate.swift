@@ -4,6 +4,7 @@ import UIKit
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private let vpnHandler = VpnChannelHandler()
+  private let systemHandler = SystemChannelHandler()
 
   override func application(
     _ application: UIApplication,
@@ -14,7 +15,11 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "VpnChannelHandler") else { return }
-    vpnHandler.register(with: registrar.messenger())
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "VpnChannelHandler") {
+      vpnHandler.register(with: registrar.messenger())
+    }
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "SystemChannelHandler") {
+      systemHandler.register(with: registrar.messenger())
+    }
   }
 }

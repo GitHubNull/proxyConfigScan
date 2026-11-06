@@ -8,6 +8,13 @@ class ProxyConfig {
     required this.isLanHost,
   });
 
+  /// 来自历史记录 / 最近扫码等已校验来源时的回填入口。
+  factory ProxyConfig.fromHostPort(String host, int port) => ProxyConfig(
+        host: host,
+        port: port,
+        isLanHost: ProxyUriValidator.isLanHost(host),
+      );
+
   final String host;
   final int port;
 
