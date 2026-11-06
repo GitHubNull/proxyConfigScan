@@ -14,7 +14,7 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "VpnChannelHandler")
+    guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "VpnChannelHandler") else { return }
     vpnHandler.register(with: registrar.messenger())
   }
 }
