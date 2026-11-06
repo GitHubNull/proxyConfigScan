@@ -1,0 +1,39 @@
+name: burp-plugin
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  jar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/burp-plugin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: burp-plugin-m2-${{ hashFiles('src/burp-plugin/pom.xml') }}
+          restore-keys: burp-plugin-m2-
+
+      - name: 单测
+        run: mvn test
+
+      - name: 打包插件 jar
+        run: mvn package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: burp-proxy-qr-plugin-${{ github.sha }}
+          path: src/burp-plugin/target/burp-proxy-qr-plugin-*.jar
+          retention-days: 14

@@ -75,6 +75,7 @@ networkSecurityConfig 的被测 APP 仍不信（免 root 无解，登记 known-l
 |---|---|---|
 | `.github/workflows/android-build.yml` | ubuntu | split-per-abi APK artifact |
 | `.github/workflows/ios-build.yml` | macos（计时 ×10 倍率，限定 push main/手动触发） | unsigned IPA artifact |
+| `.github/workflows/burp-plugin.yml` | ubuntu | 插件 jar artifact（`mvn test` + `mvn package`，JDK 21） |
 
 私有仓即可用 Actions；推送走本机代理（`~/.profile` 已配）。IPA 安装：Xcode/Apple Configurator 2 装到本机信任设备，或 AltStore/Sideloadly 侧载（免费 Apple ID 7 天有效）。
 

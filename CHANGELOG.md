@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.1] - 2026-11-06
+
+### Added
+- GitHub Actions 新增 `burp-plugin.yml`：push main/PR/手动触发，JDK 21 跑 `mvn test` + `mvn package`，上传插件 jar artifact（与 android/ios 工作流同列，doc/build-run.md 已同步）
+
 ## [0.1.0] - 2026-11-06
 
 首个发布版本。扫码配置 Burp 代理 → VPN 本地转发抓包全链路可用（Android 实机验证；iOS 编译走 GitHub Actions CI）。
