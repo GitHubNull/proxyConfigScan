@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.0] - 2026-11-07
 
 ### Added
 - 专属 App 图标：扫码框 + 自下而上隧道箭头（深青渐变底），覆盖 Android 传统/自适应/单色主题图标与 iOS 全尺寸；母版与导出脚本见 `src/mobile/icon/`
