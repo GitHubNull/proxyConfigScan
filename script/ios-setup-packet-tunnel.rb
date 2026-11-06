@@ -102,7 +102,11 @@ unless runner.dependencies.any? { |d| d.target == ext }
   embed = runner.new_copy_files_build_phase('Embed App Extensions')
   embed.symbol_dst_subfolder_spec = :plug_ins
   embed.add_file_reference(ext.product_reference)
-  puts 'Runner: 已依赖并 Embed PacketTunnel extension'
+  # flutter#135056：Embed 必须在 Run Script/Thin Binary 之前，否则新构建系统报依赖循环
+  first_script_idx = runner.build_phases.index { |ph| ph.isa == 'PBXShellScriptBuildPhase' } || runner.build_phases.size
+  runner.build_phases.delete(embed)
+  runner.build_phases.insert(first_script_idx, embed)
+  puts 'Runner: 已依赖并 Embed PacketTunnel extension（置于 Run Script 之前）'
 end
 
 project.save
