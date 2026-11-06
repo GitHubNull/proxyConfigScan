@@ -39,7 +39,7 @@ script/burp-plugin-build.sh package      # 产出 target/burp-proxy-qr-plugin-0.
 1. Burp Suite → Proxy settings → listener 绑定**局域网 IP**（非仅 127.0.0.1），端口 8080；
    或直接加载 ProxyScan QR 插件（`src/burp-plugin`，进程反查监听器零配置出码）。
 2. `script/gen-test-qr.sh <本机局域网IP> 8080`，PNG 投屏（或扫插件生成的二维码）。
-3. APP 扫码 → 允许 VPN 授权 → 状态页显示"运行中"。
+3. APP 扫码 → 允许 VPN 授权 → 状态页显示"运行中"；若未加电池优化白名单，状态页会显示「关闭电池优化」引导卡片（跳系统设置页，防息屏断连）。
 4. 手机浏览器访问 http://neverssl.com → Burp HTTP history 出现条目即通。
 5. HTTPS 站点需先装 Burp CA（见下节），否则 TLS 握手失败（引擎日志全量 ECONNREFUSED/超时）。
 
@@ -77,6 +77,10 @@ networkSecurityConfig 的被测 APP 仍不信（免 root 无解，登记 known-l
 | `.github/workflows/ios-build.yml` | macos（计时 ×10 倍率，限定 push main/手动触发） | unsigned IPA artifact |
 
 私有仓即可用 Actions；推送走本机代理（`~/.profile` 已配）。IPA 安装：Xcode/Apple Configurator 2 装到本机信任设备，或 AltStore/Sideloadly 侧载（免费 Apple ID 7 天有效）。
+
+**iOS 工程注入**：`script/ios-setup-packet-tunnel.rb`（xcodeproj gem）在 CI 的 `flutter build ios` 前把 PacketTunnel extension 接入 Runner.xcodeproj，幂等可重跑。本机无 macOS 也能预验——`~/dev_env/ruby/3.2/bin/ruby`（源码自装，配本地 libyaml）+ `gem install xcodeproj` 后直接对 `src/mobile/ios` 副本跑脚本检查产物；注意 `make distclean` 后重编 Ruby 需重新解压源码包（发行包预生成文件会被清掉）。
+
+已踩过的 iOS CI 坑（勿再犯）：根 `.gitignore` 曾误伤 `Runner.xcworkspace/` 导致 SPM 报 workspace 缺失；xcodeproj 建 extension target 不写 `PRODUCT_NAME`，构建系统无默认值 → 产物空名 `.appex` 冲突；flutter#135056「Cycle inside Runner」依赖循环 → Embed App Extensions 必须排在 Run Script/Thin Binary 之前（脚本已处理）。
 
 ## 常见报错对照
 

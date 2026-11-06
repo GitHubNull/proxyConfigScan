@@ -1,8 +1,12 @@
 package com.proxyscan.proxy_config_scan.vpn
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.net.VpnService
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -45,6 +49,22 @@ class VpnChannelHandler(
             }
             "status" -> result.success(VpnEngine.statusSnapshot())
             "prepare" -> handlePrepare(result)
+            "isBatteryExempted" -> {
+                val pm = activity.getSystemService(Context.POWER_SERVICE) as PowerManager
+                result.success(mapOf("exempted" to pm.isIgnoringBatteryOptimizations(activity.packageName)))
+            }
+            "requestBatteryExemption" -> {
+                val intent = Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:${activity.packageName}"),
+                )
+                if (intent.resolveActivity(activity.packageManager) != null) {
+                    activity.startActivity(intent)
+                } else {
+                    activity.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                }
+                result.success(mapOf("ok" to true))
+            }
             "clearError" -> {
                 VpnEngine.clearError()
                 result.success(mapOf("ok" to true))

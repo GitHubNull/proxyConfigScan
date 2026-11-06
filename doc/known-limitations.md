@@ -6,8 +6,8 @@
 
 | 限制 | 定性 | 说明 |
 |---|---|---|
-| 本机无法编译/调试 iOS | 平台限制 | 开发机为 Linux，Xcode 仅 macOS。验证方式：GitHub Actions macOS runner 编译通过 + 代码评审；真机行为待有 Mac 后补验 |
-| iOS 功能本期未实现 | 计划内 | PacketTunnel extension 在 M5 实现，runner 已保留 |
+| 本机无法编译/调试 iOS | 平台限制 | 开发机为 Linux，Xcode 仅 macOS。验证方式：GitHub Actions macOS runner 构建 unsigned IPA 通过（M5 起双工作流绿）+ 代码评审；真机行为待有 Mac 后补验 |
+| iOS 仅编译验证、未真机运行 | 平台限制 | PacketTunnel extension 已实现（hev + Swift 桥，设计见 vpn-forwarding-design.md §9）；无实体 macOS/iPhone，运行时行为未验，侧载安装见 build-run.md |
 | 安装需侧载或付费账号 | 平台限制 | 免费 Apple ID 侧载 7 天过期需重签、同时限 3 个 App；长期分发需 99 美元/年开发者账号。NetworkExtension entitlement 免费账号在开发期可用 |
 
 ## 网络能力
@@ -33,5 +33,5 @@
 
 | 限制 | 定性 | 说明 |
 |---|---|---|
-| Burp 插件本期仅骨架 | 计划内 | 二维码生成功能在插件迭代期实现；测试二维码用 `script/gen-test-qr.sh` 生成 |
+| Burp 插件功能已实现（M4 后迭代） | — | 零配置：进程反查自动发现 Burp 监听地址（见 burp-plugin.md）；无 Listener 时支持手动填写兜底 |
 | 切蜂窝网络后 VPN 上游不可达 | 设计如此 | Burp 在局域网；切网后需重新扫码（历史记录一键复用） |

@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../util/proxy_uri_validator.dart';
@@ -121,6 +123,20 @@ final vpnControllerProvider = Provider<VpnController>((ref) {
 final vpnSnapshotProvider = StreamProvider<VpnSnapshot>((ref) {
   return ref.watch(vpnControllerProvider).stream;
 });
+
+const MethodChannel _vpnMethodChannel = MethodChannel('proxy_scan/vpn');
+
+/// 电池优化白名单状态（Android 专属查询；iOS 原生恒返回 true）
+final batteryExemptedProvider = FutureProvider<bool>((ref) async {
+  if (!Platform.isAndroid) return true;
+  final raw =
+      await _vpnMethodChannel.invokeMethod<Map<dynamic, dynamic>>('isBatteryExempted');
+  return raw?['exempted'] == true;
+});
+
+/// 跳系统设置页引导关闭电池优化（Android）
+Future<void> requestBatteryExemption() =>
+    _vpnMethodChannel.invokeMethod<Map<dynamic, dynamic>>('requestBatteryExemption');
 
 /// 错误码 → 中文文案（设计文档 §3.4）
 String vpnErrorText(String? code, String? message) => switch (code) {

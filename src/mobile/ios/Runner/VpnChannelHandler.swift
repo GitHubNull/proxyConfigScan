@@ -24,6 +24,8 @@ final class VpnChannelHandler: NSObject {
             case "stop": self.stop(result: result)
             case "status": self.status(result: result)
             case "prepare": result(["granted": true]) // iOS 首次启动由系统弹授权，无 prepare 概念
+            case "isBatteryExempted": result(["exempted": true]) // iOS 无电池优化白名单概念
+            case "requestBatteryExemption": result(["ok": true]) // no-op
             case "clearError": self.clearError(result: result)
             default: result(FlutterMethodNotImplemented)
             }

@@ -17,6 +17,7 @@ class StatusPage extends ConsumerWidget {
         ref.watch(vpnControllerProvider).current;
     final scan = ref.watch(scanProvider);
     final controller = ref.watch(vpnControllerProvider);
+    final batteryExempted = ref.watch(batteryExemptedProvider).value ?? true;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -81,21 +82,80 @@ class StatusPage extends ConsumerWidget {
               children: [
                 Text('流量统计', style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 12),
-                _StatsRow(
-                  label: '发送 / 接收',
-                  value:
-                      '${_formatBytes(vpn.stats.txBytes)} / ${_formatBytes(vpn.stats.rxBytes)}',
+                Row(
+                  children: [
+                    Expanded(
+                      child: _StatTile(
+                        icon: Icons.upload,
+                        label: '发送',
+                        value: _formatBytes(vpn.stats.txBytes),
+                      ),
+                    ),
+                    Expanded(
+                      child: _StatTile(
+                        icon: Icons.download,
+                        label: '接收',
+                        value: _formatBytes(vpn.stats.rxBytes),
+                      ),
+                    ),
+                  ],
                 ),
-                _StatsRow(
-                  label: '活动连接',
-                  value: '${vpn.stats.activeConnections}',
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _StatTile(
+                        icon: Icons.link,
+                        label: '活动连接',
+                        value: '${vpn.stats.activeConnections}',
+                      ),
+                    ),
+                    Expanded(
+                      child: _StatTile(
+                        icon: Icons.dns,
+                        label: 'DNS 查询',
+                        value: '${vpn.stats.dnsQueries}',
+                      ),
+                    ),
+                  ],
                 ),
-                _StatsRow(label: 'DNS 查询', value: '${vpn.stats.dnsQueries}'),
-                _StatsRow(label: '丢弃 UDP', value: '${vpn.stats.udpDropped}'),
+                if (vpn.stats.udpDropped > 0) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatTile(
+                          icon: Icons.block,
+                          label: '丢弃 UDP（仅放行 DNS）',
+                          value: '${vpn.stats.udpDropped}',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
         ),
+        if (vpn.isRunning && batteryExempted == false)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Card(
+              color: Colors.amber.shade50,
+              child: ListTile(
+                leading: Icon(Icons.battery_saver, color: Colors.amber.shade800),
+                title: const Text('关闭电池优化'),
+                subtitle: const Text('防止息屏后代理断连；ColorOS 后台冻结另见系统设置。'),
+                trailing: FilledButton(
+                  onPressed: () async {
+                    await requestBatteryExemption();
+                    ref.invalidate(batteryExemptedProvider);
+                  },
+                  child: const Text('去设置'),
+                ),
+              ),
+            ),
+          ),
         const SizedBox(height: 12),
         Card(
           child: ListTile(
@@ -135,21 +195,29 @@ class StatusPage extends ConsumerWidget {
   }
 }
 
-class _StatsRow extends StatelessWidget {
-  const _StatsRow({required this.label, required this.value});
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
+  final IconData icon;
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(value),
+          Icon(icon, size: 20, color: Colors.grey),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(label, style: const TextStyle(color: Colors.grey)),
+          ),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
         ],
       ),
     );
