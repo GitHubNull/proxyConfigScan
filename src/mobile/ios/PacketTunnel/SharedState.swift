@@ -7,20 +7,22 @@ enum VpnSharedState {
     /// 会拿到 nil defaults 双端静默失联。embedded.mobileprovision 的 Entitlements
     /// 与签名 entitlements 一致，是进程实际被授权组的 ground truth。
     static let suiteName: String = {
-        if let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
-           let data = try? Data(contentsOf: url),
-           let text = String(data: data, encoding: .isoLatin1),
-           let start = text.range(of: "<?xml"),
-           let end = text.range(of: "</plist>") {
-            let xml = String(text[start.lowerBound...end.upperBound])
-            if let plistData = xml.data(using: .isoLatin1),
-               let plist = try? PropertyListSerialization.propertyList(from: plistData) as? [String: Any],
-               let groups = (plist["Entitlements"] as? [String: Any])?["com.apple.security.application-groups"] as? [String],
-               let first = groups.first {
-                return first
-            }
+        guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+              let data = try? Data(contentsOf: url),
+              let text = String(data: data, encoding: .isoLatin1),
+              let start = text.range(of: "<?xml"),
+              let end = text.range(of: "</plist>") else {
+            return "group.com.proxyscan.proxyconfigscan"
         }
-        return "group.com.proxyscan.proxyconfigscan"
+        let xml = String(text[start.lowerBound...end.upperBound])
+        guard let plistData = xml.data(using: .isoLatin1),
+              let raw = try? PropertyListSerialization.propertyList(from: plistData, format: nil),
+              let plist = raw as? [String: Any],
+              let groups = (plist["Entitlements"] as? [String: Any])?["com.apple.security.application-groups"] as? [String],
+              let first = groups.first else {
+            return "group.com.proxyscan.proxyconfigscan"
+        }
+        return first
     }()
 
     // 键名
