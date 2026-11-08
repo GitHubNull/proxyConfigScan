@@ -19,6 +19,7 @@ DEPLOYMENT_TARGET = '15.0'
 EXT_SOURCES = %w[
   PacketTunnel/SharedState.swift
   PacketTunnel/Socks5Bridge.swift
+  PacketTunnel/Socks5BridgeUdp.swift
   PacketTunnel/HevBridge.swift
   PacketTunnel/PacketTunnelProvider.swift
 ].freeze

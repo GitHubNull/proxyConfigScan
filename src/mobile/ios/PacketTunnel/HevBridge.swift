@@ -24,7 +24,8 @@ final class HevBridge {
 
     /// 配置：隧道内部地址与 Android 对齐（10.10.10.2/32、MTU 1500、SOCKS5 指向本地桥）
     private func makeConfig() -> String {
-        """
+        let logFile = NSTemporaryDirectory() + "hev.log"
+        return """
         tunnel:
           name: utun
           mtu: \(Self.mtu)
@@ -35,7 +36,8 @@ final class HevBridge {
           port: \(ProxyScanPorts.socks5)
           udp: 'udp'
         misc:
-          log-level: warn
+          log-level: debug
+          log-file: \(logFile)
         """
     }
 
@@ -87,6 +89,9 @@ final class HevBridge {
                 }
                 self.flowPacketCount += 1
                 self.flowByteCount += pkt.count
+                if self.flowPacketCount <= 3 {
+                    os_log(.default, "[ProxyScan] hev: flow→hev 第 %d 包 len=%d proto=%d", self.flowPacketCount, pkt.count, protocols[i].intValue)
+                }
                 if sent != frameLen {
                     os_log(.default, "[ProxyScan] hev: send 失败 errno=%d (pkt %dB)", errno, frameLen)
                 }
@@ -116,6 +121,9 @@ final class HevBridge {
                         packetFlow.writePackets([Data(pkt)], withProtocols: [NSNumber(value: AF_INET6)])
                     }
                     injectCount += 1
+                    if injectCount <= 3 {
+                        os_log(.default, "[ProxyScan] hev: hev→flow 注入第 %d 包 len=%d", injectCount, n - 4)
+                    }
                     if injectCount % 100 == 0 {
                         os_log(.default, "[ProxyScan] hev: hev→flow 累计注入 %d 包", injectCount)
                     }
