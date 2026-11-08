@@ -8,7 +8,14 @@ import UIKit
 final class VpnChannelHandler: NSObject {
     static let methodChannel = "proxy_scan/vpn"
     static let eventChannel = "proxy_scan/vpn_events"
-    static let extensionBundleId = "com.proxyscan.proxyConfigScan.PacketTunnel"
+    /// 侧载签名会把主包 ID 重写为 team 后缀变体，扩展 ID 随之变化（实测 AltSign 产物
+    /// 为 <main>.<TEAMID>.PacketTunnel）；以主包 ID 推导，Xcode 直装与侧载均一致。
+    static let extensionBundleId: String = {
+        if let bid = Bundle.main.bundleIdentifier, !bid.isEmpty {
+            return "\(bid).PacketTunnel"
+        }
+        return "com.proxyscan.proxyConfigScan.PacketTunnel"
+    }()
 
     private var eventSink: FlutterEventSink?
     private var pollTimer: Timer?

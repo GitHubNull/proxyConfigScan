@@ -100,6 +100,15 @@ else
   puts 'PacketTunnel: target 已存在，跳过创建'
 end
 
+# FLUTTER_BUILD_NAME/NUMBER 经 Runner 的 xcconfig 链传入；extension target 不挂相同 base config
+# 时版本变量展开为空，产物 Info.plist 缺 CFBundleVersion，真机安装被 installd 拒（MissingBundleVersion）
+runner.build_configurations.each do |rc|
+  ec = ext.build_configurations.find { |c| c.name == rc.name }
+  next if ec.nil? || ec.base_configuration_reference == rc.base_configuration_reference
+  ec.base_configuration_reference = rc.base_configuration_reference
+  puts "PacketTunnel: #{ec.name} 已挂 base config（对齐 Runner）"
+end
+
 # ---- 3. Runner 依赖 + Embed App Extensions ----
 
 unless runner.dependencies.any? { |d| d.target == ext }

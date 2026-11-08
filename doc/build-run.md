@@ -95,11 +95,15 @@ networkSecurityConfig 的被测 APP 仍不信（免 root 无解，登记 known-l
 
 注意：`actions/upload-artifact` 只进 Actions 运行页（14 天保留），**不会**出现在 Release Assets；发布安装包须打 `v*` tag 推送（各工作流 `softprops/action-gh-release` 步骤），或在本地 `gh release upload` 补传。
 
-私有仓即可用 Actions；推送走本机代理（`~/.profile` 已配）。IPA 安装：Xcode/Apple Configurator 2 装到本机信任设备，或 AltStore/Sideloadly 侧载（免费 Apple ID 7 天有效）。
+私有仓即可用 Actions；推送走本机代理（`~/.profile` 已配）。IPA 安装路线（按本机验证程度排序，2026-11-08 更新）：
+
+1. **越狱机直装（已真机验通，推荐）**：设备装 AppSync Unified（官方 deb 在 github.com/akemin-dayo/AppSync/releases，rootful 选 `iphoneos-arm` / rootless 选 `iphoneos-arm64`，Sileo/Filza 安装或 `dpkg -i`；装后必须 `launchctl reboot userspace` 一次），然后 `ideviceinstaller -u <UDID> -i xxx-unsigned.ipa` 直装 unsigned IPA，无过期、装后无需信任证书。注意 installd 仍做 bundle 结构校验：appex 的 Info.plist 必须有 CFBundleVersion（缺失报 MissingBundleVersion，脚本已修，见下）。**二进制签名要用设备侧 Procursus ldid 2.1.5+（sbingner 2.1.4 太旧，安装报 0xe8008029）`-Cadhoc` 假签名并带 entitlements**：Runner 与 appex 都必须含 `com.apple.developer.networking.networkextension=[packet-tunnel-provider]`（缺了 Runner 的会在保存 VPN 配置时 permission denied；缺了 appex 的隧道起不来）+ `com.apple.security.application-groups`（两侧必须同一个组，扩展的组权限以安装记录为准，装后改签名不生效）+ `application-identifier` + `get-task-allow`。安装后改动 bundle 内容须 `uicache -p <app路径>` 重新注册（否则 LaunchServices 插件注册失效，nesessionmanager 报 Found 0 registrations）。
+2. **非越狱机免费侧载（装得上、VPN 用不了）**：2026-10-21 起 Apple 改 GSA 认证，旧 AltServer 全报 -80045；jaakkopalvaila NG 版（+ `https://new.ani.sidestore.io` anisette）可完成签名，越狱机上 AppSync 也能装。但 **Network Extensions 对免费账号在 Apple API 层关闭（updateService 返回 4100「team does not have a program membership eligible for this feature」，feature 键 NWEXT04537）**，profile 拿不到 networkextension entitlement → 保存 VPN 配置 permission denied，非越狱免费侧载无 VPN 功能。免费侧载另有限制：7 天过期、同时 3 个 App。AltSign 签名会重写 App Group（加 team 后缀）与 appex bundle ID（主 ID 加 team 后缀），代码已从 profile/主包 ID 动态适配（见源码 VpnSharedState/VpnChannelHandler）。
+3. 常规正路：Xcode/Apple Configurator 2 装到信任设备，或付费开发者账号。
 
 **iOS 工程注入**：`script/ios-setup-packet-tunnel.rb`（xcodeproj gem）在 CI 的 `flutter build ios` 前把 PacketTunnel extension 接入 Runner.xcodeproj，幂等可重跑。本机无 macOS 也能预验——`~/dev_env/ruby/3.2/bin/ruby`（源码自装，配本地 libyaml）+ `gem install xcodeproj` 后直接对 `src/mobile/ios` 副本跑脚本检查产物；注意 `make distclean` 后重编 Ruby 需重新解压源码包（发行包预生成文件会被清掉）。
 
-已踩过的 iOS CI 坑（勿再犯）：根 `.gitignore` 曾误伤 `Runner.xcworkspace/` 导致 SPM 报 workspace 缺失；xcodeproj 建 extension target 不写 `PRODUCT_NAME`，构建系统无默认值 → 产物空名 `.appex` 冲突；flutter#135056「Cycle inside Runner」依赖循环 → Embed App Extensions 必须排在 Run Script/Thin Binary 之前（脚本已处理）。
+已踩过的 iOS CI 坑（勿再犯）：根 `.gitignore` 曾误伤 `Runner.xcworkspace/` 导致 SPM 报 workspace 缺失；xcodeproj 建 extension target 不写 `PRODUCT_NAME`，构建系统无默认值 → 产物空名 `.appex` 冲突；flutter#135056「Cycle inside Runner」依赖循环 → Embed App Extensions 必须排在 Run Script/Thin Binary 之前（脚本已处理）；extension target 不挂 baseConfigurationReference → `$(FLUTTER_BUILD_NAME)`/`$(FLUTTER_BUILD_NUMBER)` 展开为空、产物 appex 缺 CFBundleVersion，真机安装被 installd 拒（MissingBundleVersion），脚本已对齐 Runner 的 Debug/Release/Profile xcconfig；`CFBundleName` 带下划线（`proxy_config_scan`）会被 AltServer 注册 App ID 时报 The name for this app is invalid（已改为 `ProxyConfigScan`，显示名 CFBundleDisplayName 不变）。真机运行期坑：`NEPacketTunnelFlow.readPackets` 是完成回调式异步 API，同步 while 包一层会瞬间堆积海量未完成读取（CPU 打满、入包被复制多份、全网断），必须回调内串行链式续读；免费账号开 Network Extensions 被 Apple API 拒（4100，feature 键 NWEXT04537，付费账号可用 Spaceship/fastlane 的 updateService 补开，AltServer-NG 自身不会发该键）。
 
 ## 应用图标
 

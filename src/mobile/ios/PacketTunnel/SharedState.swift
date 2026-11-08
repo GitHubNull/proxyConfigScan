@@ -3,7 +3,25 @@ import Foundation
 /// extension 与 container（Runner）经 App Group 共享 VPN 状态/统计。
 /// 帧格式与 Android EventChannel 1s 帧对齐（doc/vpn-forwarding-design.md §3/§10）。
 enum VpnSharedState {
-    static let suiteName = "group.com.proxyscan.proxyconfigscan"
+    /// 侧载签名（AltStore/AltServer）会把 App Group 重写成 team 后缀变体；硬编码原名
+    /// 会拿到 nil defaults 双端静默失联。embedded.mobileprovision 的 Entitlements
+    /// 与签名 entitlements 一致，是进程实际被授权组的 ground truth。
+    static let suiteName: String = {
+        if let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+           let data = try? Data(contentsOf: url),
+           let text = String(data: data, encoding: .isoLatin1),
+           let start = text.range(of: "<?xml"),
+           let end = text.range(of: "</plist>") {
+            let xml = String(text[start.lowerBound...end.upperBound])
+            if let plistData = xml.data(using: .isoLatin1),
+               let plist = try? PropertyListSerialization.propertyList(from: plistData) as? [String: Any],
+               let groups = (plist["Entitlements"] as? [String: Any])?["com.apple.security.application-groups"] as? [String],
+               let first = groups.first {
+                return first
+            }
+        }
+        return "group.com.proxyscan.proxyconfigscan"
+    }()
 
     // 键名
     private enum Key {

@@ -61,20 +61,26 @@ final class HevBridge {
     }
 
     /// packetFlow → hev：IP 包前补 4 字节地址族头（utun 帧格式，小端）
+    ///
+    /// readPackets 是完成回调式异步 API，必须在回调内串行发起下一次读取；
+    /// 用同步 while 包一层会瞬间堆积海量未完成读取（CPU 打满、入包被复制多份）。
     func startFlowToHevPump(_ packetFlow: NEPacketTunnelFlow) {
-        pumpQueue.async {
-            while self.running {
-                packetFlow.readPackets { packets, protocols in
-                    for (i, pkt) in packets.enumerated() {
-                        var header = UInt32(protocols[i].intValue == AF_INET6 ? AF_INET6 : AF_INET)
-                        var frame = withUnsafeBytes(of: &header) { Array($0) } + pkt
-                        let frameLen = frame.count
-                        _ = frame.withUnsafeMutableBytes { ptr -> Int in
-                            send(self.pair.0, ptr.baseAddress, frameLen, 0)
-                        }
-                    }
+        pumpQueue.async { self.readNext(packetFlow) }
+    }
+
+    private func readNext(_ packetFlow: NEPacketTunnelFlow) {
+        guard running else { return }
+        packetFlow.readPackets { [weak self] packets, protocols in
+            guard let self else { return }
+            for (i, pkt) in packets.enumerated() {
+                var header = UInt32(protocols[i].intValue == AF_INET6 ? AF_INET6 : AF_INET)
+                var frame = withUnsafeBytes(of: &header) { Array($0) } + pkt
+                let frameLen = frame.count
+                _ = frame.withUnsafeMutableBytes { ptr -> Int in
+                    send(self.pair.0, ptr.baseAddress, frameLen, 0)
                 }
             }
+            self.readNext(packetFlow)
         }
     }
 
@@ -84,10 +90,6 @@ final class HevBridge {
             var buf = [UInt8](repeating: 0, count: 4 + Self.mtu + 64)
             while self.running {
                 let n = recv(self.pair.0, &buf, buf.count, 0)
-                if n <= 4 {
-                    if self.running { continue }
-                    break
-                }
                 if n > 4 {
                     let family = Int(buf[0]) // 小端首字节即地址族
                     let pkt = Array(buf[4..<n])
@@ -96,7 +98,10 @@ final class HevBridge {
                     } else if family == AF_INET6 {
                         packetFlow.writePackets([Data(pkt)], withProtocols: [NSNumber(value: AF_INET6)])
                     }
+                    continue
                 }
+                if n < 0, errno == EINTR { continue }
+                break // 短帧/EOF/错误（含 stop 关 fd 唤醒）：退出避免忙等
             }
         }
     }

@@ -7,8 +7,8 @@
 | 限制 | 定性 | 说明 |
 |---|---|---|
 | 本机无法编译/调试 iOS | 平台限制 | 开发机为 Linux，Xcode 仅 macOS。验证方式：GitHub Actions macOS runner 构建 unsigned IPA 通过（M5 起双工作流绿）+ 代码评审；真机行为待有 Mac 后补验 |
-| iOS 仅编译验证、未真机运行 | 平台限制 | PacketTunnel extension 已实现（hev + Swift 桥，设计见 vpn-forwarding-design.md §9）；无实体 macOS/iPhone，运行时行为未验，侧载安装见 build-run.md |
-| 安装需侧载或付费账号 | 平台限制 | 免费 Apple ID 侧载 7 天过期需重签、同时限 3 个 App；长期分发需 99 美元/年开发者账号。NetworkExtension entitlement 免费账号在开发期可用 |
+| iOS 真机运行 | 平台限制（部分已验） | 2026-11-08 iPhone 7 / iOS 15.8.4 越狱机验通：安装、VPN 配置保存、隧道建立（nesessionmanager Running）。隧道拉起要求 Runner 与 appex 均带 networkextension entitlement（越狱机经 ldid 注入）；状态联动与流量转发缺陷已修（读泵异步回调堆积、App Group/appex ID 硬编码），待 CI 构建复验 |
+| 安装需侧载或付费账号 | 平台限制 | 越狱机：AppSync Unified + ideviceinstaller 直装 unsigned IPA（先 `launchctl reboot userspace`），二进制需 ldid 2.1.5+ `-Cadhoc` 假签名带 entitlements，完整路线见 build-run.md。非越狱机：免费 Apple ID 侧载 7 天过期、限 3 个 App，且 **Network Extensions 被 Apple API 层拒绝（4100）**，profile 无 networkextension entitlement，保存 VPN 配置 permission denied——免费侧载装得上但 VPN 功能不可用，需 99 美元/年付费账号。注：2026-10-21 起旧 AltServer 全报 -80045，用 jaakkopalvaila NG 版 |
 | iOS 无法自动安装/枚举 CA | 平台限制 | App 只能把 Burp CA 存到临时文件并弹分享面板；用户须存到「文件」后到 设置 → 通用 → VPN 与设备管理 安装，并在「证书信任设置」完全信任。安装结果 App 无法读取，状态卡片显示“无法检测” |
 
 ## 证书（Burp CA）
