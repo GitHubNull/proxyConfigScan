@@ -1,3 +1,4 @@
+import os.log
 import Foundation
 import Network
 
@@ -108,7 +109,7 @@ final class Socks5Bridge {
         var req = [UInt8](repeating: 0, count: 4)
         guard readFully(fd, &req, 4), req[0] == 5 else { return }
         guard let target = readAddress(fd, atyp: req[3]) else { return }
-        NSLog("[ProxyScan] socks5: 新连接 cmd=%d target=%@:%d", req[1], target.host, target.port)
+        os_log(.default, "[ProxyScan] socks5: 新连接 cmd=%d target=%@:%d", req[1], target.host, target.port)
 
         switch req[1] {
         case 0x01: // CONNECT

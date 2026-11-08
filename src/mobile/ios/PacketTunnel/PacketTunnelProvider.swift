@@ -1,3 +1,4 @@
+import os.log
 import NetworkExtension
 import Foundation
 
@@ -28,13 +29,13 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         }
         upstream = parsed
         VpnSharedState.writeState("preparing", upstream: upstreamStr)
-        NSLog("[ProxyScan] tunnel: startTunnel upstream=%@ options=%@", upstreamStr, options?["upstream"] as? String ?? "nil")
+        os_log(.default, "[ProxyScan] tunnel: startTunnel upstream=%@ options=%@", upstreamStr, options?["upstream"] as? String ?? "nil")
 
         let settings = makeTunnelSettings()
         setTunnelNetworkSettings(settings) { [weak self] error in
             guard let self else { return }
             if let error {
-                NSLog("[ProxyScan] tunnel: setTunnelNetworkSettings 失败 %@", error.localizedDescription)
+                os_log(.default, "[ProxyScan] tunnel: setTunnelNetworkSettings 失败 %@", error.localizedDescription)
                 self.fail("TUN_OPEN_FAILED", "网络设置失败：\(error.localizedDescription)")
                 completionHandler(nil)
                 return
@@ -77,12 +78,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         do {
             try b.start()
         } catch {
-            NSLog("[ProxyScan] tunnel: 本地桥启动失败 %@", error.localizedDescription)
+            os_log(.default, "[ProxyScan] tunnel: 本地桥启动失败 %@", error.localizedDescription)
             fail("INTERNAL", "本地桥启动失败：\(error.localizedDescription)")
             return
         }
         bridge = b
-        NSLog("[ProxyScan] tunnel: socks5 桥已监听 127.0.0.1:%d，hev 启动中", ProxyScanPorts.socks5)
+        os_log(.default, "[ProxyScan] tunnel: socks5 桥已监听 127.0.0.1:%d，hev 启动中", ProxyScanPorts.socks5)
 
         let h = HevBridge()
         hev = h
