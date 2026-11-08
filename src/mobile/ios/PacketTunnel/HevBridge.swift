@@ -44,11 +44,13 @@ final class HevBridge {
         guard socketpair(AF_UNIX, SOCK_DGRAM, 0, &fds) == 0 else { return -1 }
         pair = (fds[0], fds[1])
         running = true
+        NSLog("[ProxyScan] hev: socketpair ok fds=%d,%d", fds[0], fds[1])
 
         let config = makeConfig()
         let rc: Int32 = config.withCString { ptr in
             hev_main_from_str(ptr, UInt32(config.utf8.count), fds[1])
         }
+        NSLog("[ProxyScan] hev: main_from_str returned rc=%d (0=quit 正常退出)", rc)
         return rc
     }
 
@@ -68,6 +70,9 @@ final class HevBridge {
         pumpQueue.async { self.readNext(packetFlow) }
     }
 
+    private var flowPacketCount = 0
+    private var flowByteCount = 0
+
     private func readNext(_ packetFlow: NEPacketTunnelFlow) {
         guard running else { return }
         packetFlow.readPackets { [weak self] packets, protocols in
@@ -76,9 +81,17 @@ final class HevBridge {
                 var header = UInt32(protocols[i].intValue == AF_INET6 ? AF_INET6 : AF_INET)
                 var frame = withUnsafeBytes(of: &header) { Array($0) } + pkt
                 let frameLen = frame.count
-                _ = frame.withUnsafeMutableBytes { ptr -> Int in
+                let sent = frame.withUnsafeMutableBytes { ptr -> Int in
                     send(self.pair.0, ptr.baseAddress, frameLen, 0)
                 }
+                self.flowPacketCount += 1
+                self.flowByteCount += pkt.count
+                if sent != frameLen {
+                    NSLog("[ProxyScan] hev: send 失败 errno=%d (pkt %dB)", errno, frameLen)
+                }
+            }
+            if self.flowPacketCount % 100 == 0 {
+                NSLog("[ProxyScan] hev: flow→hev 累计 %d 包 %d 字节", self.flowPacketCount, self.flowByteCount)
             }
             self.readNext(packetFlow)
         }
@@ -88,6 +101,7 @@ final class HevBridge {
     func startHevToFlowPump(_ packetFlow: NEPacketTunnelFlow) {
         pumpQueue.async {
             var buf = [UInt8](repeating: 0, count: 4 + Self.mtu + 64)
+            var injectCount = 0
             while self.running {
                 let n = recv(self.pair.0, &buf, buf.count, 0)
                 if n > 4 {
@@ -98,9 +112,14 @@ final class HevBridge {
                     } else if family == AF_INET6 {
                         packetFlow.writePackets([Data(pkt)], withProtocols: [NSNumber(value: AF_INET6)])
                     }
+                    injectCount += 1
+                    if injectCount % 100 == 0 {
+                        NSLog("[ProxyScan] hev: hev→flow 累计注入 %d 包", injectCount)
+                    }
                     continue
                 }
                 if n < 0, errno == EINTR { continue }
+                NSLog("[ProxyScan] hev: 读泵退出 n=%d errno=%d", n, errno)
                 break // 短帧/EOF/错误（含 stop 关 fd 唤醒）：退出避免忙等
             }
         }
