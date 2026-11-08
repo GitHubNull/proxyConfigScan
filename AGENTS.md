@@ -44,7 +44,7 @@ ls -l src/mobile/build/app/outputs/flutter-apk/*.apk
 ## Git 约定
 
 - 只在用户明确要求时提交；push/release 需用户明确授权（smart-commit 技能批除外：版本+CHANGELOG+tag+push 一次走完）。
-- 仓库全私有；禁止 force-push main；新远程仓需用户确认。
+- 仓库默认私有；**本仓已于 2026-11-08 转公开**（用户决策：无涉密内容 + 无境外卡无法绑 billing，公开仓 Actions 标准 runner 免费）；禁止 force-push main；新远程仓需用户确认。
 - 负面测试/诱饵文件用 ignore-config 排除，不删文件过门禁。
 
 ## 测试要点
