@@ -106,7 +106,9 @@ final class HevBridge {
             while self.running {
                 let n = recv(self.pair.0, &buf, buf.count, 0)
                 if n > 4 {
-                    let family = Int(buf[0]) // 小端首字节即地址族
+                    // hev GENERIC_HEAD 写路径用 htonl(AF_INET) 大端族头（hev-tunnel.h），
+                    // 取末字节；写方向 hev 不解释族头，本端小端补头即可
+                    let family = Int(buf[3])
                     let pkt = Array(buf[4..<n])
                     if family == AF_INET {
                         packetFlow.writePackets([Data(pkt)], withProtocols: [NSNumber(value: AF_INET)])
