@@ -29,7 +29,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         }
         upstream = parsed
         VpnSharedState.writeState("preparing", upstream: upstreamStr)
-        os_log(.default, "[ProxyScan] tunnel: startTunnel upstream=%@ options=%@", upstreamStr, options?["upstream"] as? String ?? "nil")
+        os_log(.default, "[ProxyScan] tunnel: startTunnel upstream=%@ options=%@", upstreamStr ?? "nil", options?["upstream"] as? String ?? "nil")
 
         let settings = makeTunnelSettings()
         setTunnelNetworkSettings(settings) { [weak self] error in
